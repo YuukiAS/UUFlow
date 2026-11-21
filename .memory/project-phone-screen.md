@@ -24,6 +24,8 @@ metadata:
 - 镜像组里的从属屏不单独管（PR #43，2.7.4）：`Screens.standalone()`；本机只有内建屏，镜像没实测，等作者在 2.7.4 上验证撤屏后
 - 睡着时撤屏、唤醒后设回只有单测：锁屏下按 Snug 的按钮不可靠。要测就写个直接调 ScreenSet 的小程序，别靠界面按钮
 
+**悬停提示残留（#46，11-21，未复现、等报告人补材料）**：报告人（Mac mini + 两块外接屏 + BetterDisplay）说程序坞标签、Snug 菜单栏提示「等待连接」挂着不消失，退出 Snug 就好。本机实验（草稿区 `tooltip/` 的小程序，按窗口列表探测提示窗）：普通 App 的提示在挪窗口、warp 走指针、加撤虚拟屏、虚拟屏上悬停后撤屏、挪外接屏这几种情况下都会自己收掉；挪外接屏时指针不动、内容平移，会在指针下冒出新提示（已证实）。程序坞标签、菜单栏提示由系统画，没测成。主人定：太小众，先请报告人补完整日志、截图、关手势是否还出现。实验要点：测试 App 不在前台时提示不出（要 activate，测完把原前台 App 还回去）；终端没录屏权限，截不了图；程序坞会被全屏 App 藏起来
+
 **真机自测**
 - **正式版只让访达开**：`osascript -e 'tell application "Finder" to open (POSIX file "/Applications/Snug.app" as alias)'`。别用 `open -a` 或直接执行：LaunchServices 会把发起者的环境变量交给 Snug，再传给从屏上打开的 App（11-15、11-16 两次把 `CLAUDE_CODE_*` 带进主人的 Ghostty）。查法 `ps -E -ww -o command= -p <pid> | tr ' ' '\n' | grep CLAUDE_CODE`
 - 测试版：`scripts/snug app`，SIGTERM 正在跑的 Snug（`pkill` 锚定完整路径），用 `env -i HOME=… PATH=/usr/bin:/bin /usr/bin/open -n -g build/Snug.app --args --preview-screens` 起（权限按 Snug 自己算、没有环境变量可传）；屏幕列表直接写 config.json。测完 SIGTERM，再从访达重开正式版

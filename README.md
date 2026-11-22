@@ -41,7 +41,7 @@
 | **国内源** | 腾讯云 CDN 加速，中国大陆推荐 | [Snug.dmg](https://dl.zephyrxiang.com/snug/latest/Snug.dmg) |
 | **GitHub Releases** | 附更新说明、校验文件与历史版本 | [前往下载](https://github.com/zephyr4123/snug/releases/latest) |
 
-两个渠道的安装包完全相同。Snug 仅需安装于被控 Mac，控制端只需 UU远程。
+两个渠道的安装包完全相同。Snug 仅需安装于被控 Mac；控制端为安卓手机、iPhone、平板或电脑，只需 UU远程，无需另装 Snug。
 
 > Windows 被控端：参见 [社区移植](#-社区移植)。
 

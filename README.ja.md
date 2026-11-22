@@ -41,7 +41,7 @@ UU远程 のために構築 · リモート Mac の表示とタッチを強化<b
 | **中国ミラー** | Tencent Cloud CDN。中国本土では推奨 | [Snug.dmg](https://dl.zephyrxiang.com/snug/latest/Snug.dmg) |
 | **GitHub Releases** | リリースノート、チェックサム、過去のバージョン | [Releases へ](https://github.com/zephyr4123/snug/releases/latest) |
 
-どちらの入手先も同一のパッケージです。Snug は操作対象の Mac 上でのみ動作し、操作する側のデバイスには UU远程 だけがあれば十分です。
+どちらの入手先も同一のパッケージです。Snug は操作対象の Mac 上でのみ動作します。操作する側のデバイス（Android スマートフォン、iPhone、タブレット、パソコン）には UU远程 だけがあれば十分で、Snug のインストールは不要です。
 
 > Windows ホストの場合：[コミュニティ移植版](#-コミュニティ移植版)を参照してください。
 

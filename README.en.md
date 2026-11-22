@@ -41,7 +41,7 @@ Built for UU Remote · Display and touch enhancements for remote Macs<br>A dedic
 | **China mirror** | Tencent Cloud CDN; recommended in mainland China | [Snug.dmg](https://dl.zephyrxiang.com/snug/latest/Snug.dmg) |
 | **GitHub Releases** | Release notes, checksums, and previous versions | [Go to Releases](https://github.com/zephyr4123/snug/releases/latest) |
 
-Identical packages from both sources. Snug runs only on the Mac being controlled; the controlling device needs only UU Remote.
+Identical packages from both sources. Snug runs only on the Mac being controlled; the controlling device, an Android phone, iPhone, tablet, or computer, needs only UU Remote, with no Snug app to install.
 
 > Windows hosts: see [Community Ports](#-community-ports).
 

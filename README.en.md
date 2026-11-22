@@ -316,6 +316,12 @@ scripts/snug install   # build, install, and launch
 
 Community ports are developed, released, and maintained independently by their authors. This repository develops and tests only the macOS version and has not tested these ports; please report issues to the respective repositories.
 
+## ☕ Sponsor
+
+Snug is free and open source. If it helps you, you're welcome to buy me a coffee to support ongoing development and maintenance.
+
+<p align="center"><img src="https://dl.zephyrxiang.com/snug/media/sponsor-wechat.e4a93cbc.jpg" width="30%" alt="WeChat Pay QR code"> <img src="https://dl.zephyrxiang.com/snug/media/sponsor-alipay.bd597066.jpg" width="27%" alt="Alipay QR code"><br><sub>WeChat Pay · Alipay</sub></p>
+
 ## 🙏 Acknowledgments
 
 First and foremost, we extend our sincere respect to **[UU Remote](https://uuyc.163.com/)**.

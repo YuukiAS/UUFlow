@@ -316,6 +316,12 @@ scripts/snug install   # 构建、安装并打开
 
 社区移植由各自作者独立开发、发布与维护。本仓库仅开发与测试 macOS 版，未测试上述移植版本；使用问题请至对应仓库反馈。
 
+## ☕ 赞助
+
+Snug 免费开源。如果它帮到了你，欢迎请我喝杯咖啡，支持后续的开发与维护。
+
+<p align="center"><img src="https://dl.zephyrxiang.com/snug/media/sponsor-wechat.e4a93cbc.jpg" width="30%" alt="微信支付收款码"> <img src="https://dl.zephyrxiang.com/snug/media/sponsor-alipay.bd597066.jpg" width="27%" alt="支付宝收款码"><br><sub>微信 · 支付宝</sub></p>
+
 ## 🙏 致谢
 
 首先，谨向 **[UU远程](https://uuyc.163.com/)** 致以诚挚的敬意。

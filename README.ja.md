@@ -316,6 +316,12 @@ scripts/snug install   # build, install, and launch
 
 コミュニティ移植版は、各作者が独立して開発・リリース・メンテナンスしています。このリポジトリは macOS 版のみを開発・テストしており、これらの移植版はテストしていません。問題は各リポジトリに報告してください。
 
+## ☕ スポンサー
+
+Snug は無料のオープンソースです。お役に立てたなら、コーヒー一杯分のご支援をいただけると、今後の開発と保守の励みになります。
+
+<p align="center"><img src="https://dl.zephyrxiang.com/snug/media/sponsor-wechat.e4a93cbc.jpg" width="30%" alt="WeChat Pay の QR コード"> <img src="https://dl.zephyrxiang.com/snug/media/sponsor-alipay.bd597066.jpg" width="27%" alt="Alipay の QR コード"><br><sub>WeChat Pay · Alipay</sub></p>
+
 ## 🙏 謝辞
 
 まず何よりも、**[UU远程](https://uuyc.163.com/)** に心からの敬意を表します。

@@ -42,6 +42,63 @@ Controller 不复制 Snug 的虚拟屏和窗口管理能力，也不自建远控
 
 如果通过，这部分尽量少改，后续优先保持与上游可同步。
 
+### Phase 0 当前现场
+
+当前 fork 已经在 Mac mini 完成安装。继续通过 Legion Y9000P 使用 UU远程时，现有 Snug 逻辑会因为“远程中就创建所有已启用虚拟屏”改变显示拓扑，已经影响正常 Legion 远控，因此 Phase 0 的继续实测已中断。
+
+在下一项修复完成前：
+
+- 不把当前 UUFlow 作为 Mac mini 常驻远控组件运行；
+- 正在依赖 Legion 远控时，不重新安装或启动会创建虚拟屏的版本；
+- 可以继续做源码修改和离线测试；
+- 真实安装、连接、切换设备验收放在用户位于 Mac mini 旁边，或明确接受远控暂时中断的测试窗口。
+
+---
+
+## Phase 0.5：按控制端决定是否介入和创建哪块屏
+
+这是当前最高优先级 TODO，必须在 macOS / Windows Controller 之前完成。
+
+现有实现已经能从 UU远程“本机被控中”页面读取控制端名称，并通过 `RemoteObservation.controllers`、`RemoteSession.controllers` 传到核心；缺口在 `ScreenPlan`：它当前完全忽略控制端名称，只要进入远程会话就创建所有已启用屏幕。
+
+目标行为：
+
+- **Legion Y9000P**：完全旁路 UUFlow 显示增强。不创建虚拟屏、不搬窗口、不改变 Mac mini 显示拓扑，继续使用 UU远程看到的原主屏。
+- **手机**：只创建绑定的手机屏，启用手机比例、字号、触控翻译和 App 资源库。
+- **iPad / 平板**：只创建绑定的平板屏，启用平板布局、触控和 App 资源库。
+- **MacBook Neo**：只创建绑定的电脑屏，使用 Neo 对应分辨率；电脑屏不做手机/平板触控翻译。后续 LOCAL / REMOTE 键盘和触控板仍由 Controller 负责。
+- **未识别控制端**：默认旁路，不创建任何 UUFlow 虚拟屏，也不改变现有远控体验。
+
+实现边界：
+
+1. 继续复用现有 UU 控制端识别，不新增第二套识别机制。
+2. 在配置层增加“控制端名称 → 对应屏幕 / 旁路”的用户规则。
+3. 屏幕选择策略仍集中在 `ScreenPlan`，设备判断不散进 UI、`DeskSet` 或 UU 适配器。
+4. `AppController` 只负责把当前会话的控制端信息交给屏幕策略。
+5. 每个控制端只得到自己绑定的屏，不再因为远程开始就创建全部 enabled 屏。
+6. `--preview-screens` 继续用于本机预览，不受真实控制端规则限制。
+7. 重新核对“设为主屏”与设备规则的关系，不能让 Legion 旁路被常驻主屏绕过。
+8. 本阶段不开发 AltTab Controller，也不开发触控板手势。
+
+先用纯逻辑测试钉住：
+
+- Legion → 0 块屏；
+- 手机 → 只手机屏；
+- iPad → 只平板屏；
+- Neo → 只 Neo 电脑屏；
+- 未识别 → 0 块屏；
+- 控制端接管/切换后只保留新控制端对应屏；
+- preview 仍可正常预览；
+- 原有手机/平板/电脑行为映射保持不变。
+
+最后再做实机验收：
+
+1. Legion 连接时显示拓扑完全不变；
+2. 手机连接只出现手机屏；
+3. iPad 连接只出现平板屏；
+4. Neo 连接只出现 Neo 电脑屏；
+5. 断开、重连、接管后屏幕和窗口恢复正常。
+
 ---
 
 ## Phase 1：macOS Controller，先解决键盘 LOCAL / REMOTE
@@ -158,10 +215,12 @@ UUFlow 是 Snug 的功能扩展，不以大规模重写上游为目标。
 
 ## 当前实施顺序
 
-1. **部署当前 UUFlow fork 到 Mac mini，先看现有 Snug 能力实际效果。**
-2. **macOS Controller：先打通 LOCAL / REMOTE + AltTab。**
-3. **Windows Controller：把同一键盘模式带到 ThinkPad。**
-4. **macOS 触控板：三指 Space / Mission Control / App Exposé。**
-5. **最后再评估 Windows 触控板和其他输入增强。**
+1. **Phase 0 已完成安装，但实测发现会干扰 Legion 远控；当前版本先停止常驻使用。**
+2. **Phase 0.5：先实现“按控制端设备选择屏幕或完全旁路”，并确保 Legion 连接时 UUFlow 不介入。**
+3. **回到 Mac mini 旁完成 Legion / 手机 / iPad / Neo 四类真实设备验收，确认 Snug 底座值得长期保留。**
+4. **macOS Controller：打通 LOCAL / REMOTE + AltTab。**
+5. **Windows Controller：把同一键盘模式带到 ThinkPad。**
+6. **macOS 触控板：三指 Space / Mission Control / App Exposé。**
+7. **最后再评估 Windows 触控板和其他输入增强。**
 
-在 Phase 0 和 Phase 1 没有得到真实设备结果前，不提前建设后续阶段。
+Phase 0.5 没有通过前，不开始 Controller 和触控板开发。

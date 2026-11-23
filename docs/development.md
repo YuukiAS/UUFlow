@@ -111,7 +111,7 @@ RemoteContractTests → SnugCore, 每家的纯逻辑目标（RemoteUU）
 
 | 类型 | 管什么 |
 | :--- | :--- |
-| `ScreenPlan` | 纯函数：按配置和远程状态算出这一刻要哪几块屏（`ScreenWish`；设为主屏的那块不在远程也要，即常驻），每块给什么行为（`ScreenBehavior.touch`：是不是触屏，即有没有面板、翻不翻译手势、铺不铺满、调不调字号）。行为只在这里按型号的类别定，下游只认它、不认类别；`Desk.State` 把它发布给界面 |
+| `ScreenPlan` | 纯函数：按配置、远程状态与这一拍实际读到的控制端名称算出这一刻要哪块屏（`ScreenWish`）。真实远程只接受恰好一个名称及其显式绑定；其余情况返回空计划。预览模式忽略规则并创建全部已启用屏幕。每块屏的行为只在这里按型号类别定，下游只认行为、不认类别；`Desk.State` 把它发布给界面 |
 | `ScreenSet` | 屏幕拓扑的唯一来源：加屏、撤屏、换档、换比例、重试、最短在线时间、设为主屏与还原排列 |
 | `Desk` | 一块屏上的事：放窗口（手机、平板铺满换档，电脑只挪过来居中）、换档、字号、归位、还原记录（触屏 `placed/<屏 id>.json`，电脑屏挪过来的窗口一个一份），正在做什么按号排（`Desk.Ticket`） |
 | `DeskSet` | 管所有 `Desk`：在同一条 `SerialLane` 上排队，处理跨屏的事（窗口从一块屏转到另一块、退出 App 时各屏归位、撤屏前清场、在手机上退出某块屏）；留下的账交给 `LeftBehindLedger`，盯退出和关窗交给 `RequestWatcher` |
@@ -144,7 +144,7 @@ SNUG_WRITE_TOKENS=1 swift test --filter DesignTokensTests
 
 | 位置 | 内容 |
 | :--- | :--- |
-| `~/Library/Application Support/Snug/config.json` | 设置，含屏幕列表 `screens`、主屏 `mainScreen`。兼容 2.5 的 `phoneScreen`、`phone` 取第一块竖屏手机，也支持沿用原先那块已识别为 iPad 的竖屏。旧字段过两个大版本再停写。降级后，2.5 写盘时会丢掉 `screens`、`mainScreen`、`nextSerialBlock`，再升级只保留旧字段记录的那块屏 |
+| `~/Library/Application Support/Snug/config.json` | 设置，含屏幕列表 `screens`、控制端精确匹配规则 `controllerBindings`，以及为旧配置和预览保留的 `mainScreen`。兼容 2.5 的 `phoneScreen`、`phone` 取第一块竖屏手机，也支持沿用原先那块已识别为 iPad 的竖屏。旧字段过两个大版本再停写。降级后，旧版会丢掉新字段 |
 | `~/Library/Application Support/Snug/placed/<屏 id>.json` | 各块屏上窗口的还原记录；电脑屏挪过来的窗口一个一份，`placed/<屏 id>~<pid>-<窗口号>.json`。2.5 的 `phone-screen.json` 启动时挪成 `placed/phone.json` 再按它还原；手机屏已经有账时挪成 `placed/phone-2.5.json`，一样还 |
 | `~/Library/Application Support/Snug/zoom.json` | 各 App 记忆的字号级数 |
 | `~/Library/Application Support/Snug/left-behind.json` | 在 Snug 之外关闭的窗口待还原的位置与字号（保留两周） |

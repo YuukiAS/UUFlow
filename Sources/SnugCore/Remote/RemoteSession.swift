@@ -38,6 +38,8 @@ public struct RemoteSession: Sendable {
     public var isConnected: Bool { tracker.isConnected }
     /// 此刻连着的控制端（断开时为空）
     public var controllers: [String] { tracker.controllers }
+    /// 这一拍从归属远控实际读到的控制端名称。路由必须用它：暂时读不到、出现多个名称时都要立即旁路，不能沿用旧名字猜设备。
+    public var observedControllers: [String] { tracked?.observation.controllers ?? [] }
     public var inEpisode: Bool { episode.isActive }
 
     /// readings：每家登记的远控这一拍的观测，按登记顺序

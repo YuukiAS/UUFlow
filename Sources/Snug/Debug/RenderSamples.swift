@@ -64,16 +64,15 @@ enum RenderSamples {
         return s
     }
 
-    /// 远程中，开着的屏都建好了；手机在看第一块屏
+    /// 手机控制端已绑定手机屏，远程中只建这一块；手机正在看它
     private static func connected(_ s: AppState) {
         s.connection = .connected
         s.remoteName = Remotes.all.first?.identity.displayName
         s.controllers = ["iPhone 17 Pro Max"]
-        for (i, screen) in s.config.screens.enumerated() {
-            var desk = Desk.State()
-            desk.screen = .ready(DisplayID(20 + i))
-            s.desks.desks[screen.id] = desk
-        }
+        s.config.bindController("iPhone 17 Pro Max", to: .phone)
+        var desk = Desk.State()
+        desk.screen = .ready(DisplayID(20))
+        s.desks.desks[.phone] = desk
         s.streamedDisplay = 20
     }
 
@@ -87,7 +86,6 @@ enum RenderSamples {
                 connected(s)
                 s.desks.desks[.phone]?.placed = Desk.Placed(window: windows[0], zoom: 2)
             },
-            page("settings-screens-main") { s in s.config.mainScreen = computerID },
             page("settings-screens-legacy") { s in s.config = AppConfig() },
             page("settings-screens-trouble") { s in
                 s.config = sampleConfig(count: ScreenConfig.limit)

@@ -31,6 +31,12 @@ extension AppController: AppIntents {
         applyPlan()
     }
 
+    func bindController(_ name: String, to screen: ScreenID?) {
+        let target = screen.flatMap { state.screen($0)?.name } ?? "旁路"
+        guard changeConfig("控制端「\(name)」→ \(target)", { $0.bindController(name, to: screen) }) else { return }
+        applyPlan()
+    }
+
     func setScreenDevice(_ id: ScreenID, _ device: DeviceChoice) {
         let fit = ScreenPlan.fit(device, state.screen(id)?.orientation ?? .portrait)
         editScreen(id, "型号 → \(device.title)（\(fit)）") { $0.device = device }

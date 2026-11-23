@@ -6,33 +6,60 @@ struct ScreenPlanTests {
     private let ipad = DeviceChoice(model: "Apple iPad（A16）", screen: DeviceScreen(width: 1640, height: 2360, points: 820), kind: .tablet)
     private let air = DeviceChoice(model: "Apple MacBook Air 13 英寸（M4）", screen: DeviceScreen(width: 956, height: 1470, notch: 33), kind: .computer)
     private let remote = true
+    private let legion = "LEGION-Y9000P"
+    private let phone = "Alice iPhone"
+    private let tablet = "Alice iPad"
+    private let neo = "MacBook Neo"
 
-    /// 手机竖屏 + iPad 横屏 + 关着的 Air
+    /// 手机竖屏 + iPad 横屏 + Neo 电脑屏，以及四条控制端规则
     private func config() -> AppConfig {
         var c = AppConfig()
         c.addScreen(orientation: .landscape, device: ipad)
-        var off = c.addScreen(orientation: .landscape, device: air)!
-        off.enabled = false
-        c.screens[2] = off
+        c.addScreen(orientation: .landscape, device: air, name: "Neo 电脑屏")
+        c.bindController(legion, to: nil)
+        c.bindController(phone, to: .phone)
+        c.bindController(tablet, to: c.screens[1].id)
+        c.bindController(neo, to: c.screens[2].id)
         return c
     }
 
-    @Test("远程中（含重连等待期）：建出所有开着的屏，按列表顺序；关着的不建")
-    func enabledScreens() {
+    @Test("Legion 显式旁路；未识别、未配置、同时出现多个控制端也都旁路")
+    func bypasses() {
         let c = config()
-        let wishes = ScreenPlan.wishes(config: c, remote: remote, trusted: true)
-        #expect(wishes.map(\.id) == [.phone, c.screens[1].id])
-        #expect(wishes[0].spec == ScreenPlan.spec(of: c.screens[0]))
-        #expect(wishes[1].fit == ScreenPlan.fit(of: c.screens[1]))
+        #expect(ScreenPlan.wishes(config: c, remote: remote, controllers: [legion], trusted: true).isEmpty)
+        #expect(ScreenPlan.wishes(config: c, remote: remote, controllers: [], trusted: true).isEmpty)
+        #expect(ScreenPlan.wishes(config: c, remote: remote, controllers: ["未配置设备"], trusted: true).isEmpty)
+        #expect(ScreenPlan.wishes(config: c, remote: remote, controllers: [phone, legion], trusted: true).isEmpty)
     }
 
-    @Test("不在远程（没设主屏）、没有辅助功能权限：一块都不要；预览模式不等远程")
+    @Test("手机、iPad、Neo 各只创建绑定的那一块屏")
+    func oneBoundScreen() {
+        let c = config()
+        let phoneWishes = ScreenPlan.wishes(config: c, remote: remote, controllers: [phone], trusted: true)
+        let tabletWishes = ScreenPlan.wishes(config: c, remote: remote, controllers: [tablet], trusted: true)
+        let neoWishes = ScreenPlan.wishes(config: c, remote: remote, controllers: [neo], trusted: true)
+        #expect(phoneWishes.map(\.id) == [.phone])
+        #expect(tabletWishes.map(\.id) == [c.screens[1].id])
+        #expect(neoWishes.map(\.id) == [c.screens[2].id])
+        #expect(phoneWishes[0].spec == ScreenPlan.spec(of: c.screens[0]))
+        #expect(tabletWishes[0].fit == ScreenPlan.fit(of: c.screens[1]))
+    }
+
+    @Test("控制端接管后，策略只保留新控制端绑定的屏")
+    func takeover() {
+        let c = config()
+        #expect(ScreenPlan.wishes(config: c, remote: remote, controllers: [phone], trusted: true).map(\.id) == [.phone])
+        #expect(ScreenPlan.wishes(config: c, remote: remote, controllers: [neo], trusted: true).map(\.id) == [c.screens[2].id])
+        #expect(ScreenPlan.wishes(config: c, remote: remote, controllers: [legion], trusted: true).isEmpty)
+    }
+
+    @Test("不在远程、没有辅助功能权限：一块都不要；预览模式不依赖控制端，仍建所有开着的屏")
     func gates() {
         let c = config()
-        #expect(ScreenPlan.wishes(config: c, remote: false, trusted: true).isEmpty)
-        #expect(ScreenPlan.wishes(config: c, remote: remote, trusted: false).isEmpty)
-        #expect(ScreenPlan.wishes(config: c, remote: false, trusted: true, preview: true).count == 2)
-        #expect(ScreenPlan.wishes(config: c, remote: false, trusted: false, preview: true).isEmpty)
+        #expect(ScreenPlan.wishes(config: c, remote: false, controllers: [phone], trusted: true).isEmpty)
+        #expect(ScreenPlan.wishes(config: c, remote: remote, controllers: [phone], trusted: false).isEmpty)
+        #expect(ScreenPlan.wishes(config: c, remote: false, controllers: [], trusted: true, preview: true).count == 3)
+        #expect(ScreenPlan.wishes(config: c, remote: false, controllers: [], trusted: false, preview: true).isEmpty)
     }
 
     @Test("类别 → 行为：手机、平板是触屏，电脑不是；手势总开关不改行为（翻不翻译由界面层按开关定）")
@@ -41,43 +68,35 @@ struct ScreenPlanTests {
         #expect(ScreenPlan.behavior(.tablet) == .touchScreen)
         #expect(ScreenPlan.behavior(.computer) == .computer)
         var c = config()
-        c.screens[2].enabled = true
-        let on = ScreenPlan.wishes(config: c, remote: remote, trusted: true)
+        let phoneWish = ScreenPlan.wishes(config: c, remote: remote, controllers: [phone], trusted: true)
+        let tabletWish = ScreenPlan.wishes(config: c, remote: remote, controllers: [tablet], trusted: true)
+        let computerWish = ScreenPlan.wishes(config: c, remote: remote, controllers: [neo], trusted: true)
         c.gestures = false
-        #expect(ScreenPlan.wishes(config: c, remote: remote, trusted: true) == on)
-        #expect(on.map(\.behavior.touch) == [true, true, false])
+        #expect(ScreenPlan.wishes(config: c, remote: remote, controllers: [phone], trusted: true) == phoneWish)
+        #expect([phoneWish[0].behavior.touch, tabletWish[0].behavior.touch, computerWish[0].behavior.touch] == [true, true, false])
     }
 
     @Test("身份按方向：竖屏 0xF0、横屏 0xF1，像素上限跟着方向；迁移来的那块沿用老身份")
     func identity() {
         let c = config()
-        let wishes = ScreenPlan.wishes(config: c, remote: remote, trusted: true)
-        #expect(wishes[0].spec.productID == ScreenSpec.portraitProductID)
-        #expect(wishes[0].spec.maxPixels == ScreenFit.portraitPixels)
-        #expect(wishes[0].spec.serials == [200_000_108, 200_000_118, 200_000_128])
-        #expect(wishes[0].spec.name == "Snug 手机屏")
-        #expect(wishes[1].spec.productID == ScreenSpec.landscapeProductID)
-        #expect(wishes[1].spec.maxPixels == ScreenFit.landscapePixels)
+        let phoneWishes = ScreenPlan.wishes(config: c, remote: remote, controllers: [phone], trusted: true)
+        let tabletWishes = ScreenPlan.wishes(config: c, remote: remote, controllers: [tablet], trusted: true)
+        #expect(phoneWishes[0].spec.productID == ScreenSpec.portraitProductID)
+        #expect(phoneWishes[0].spec.maxPixels == ScreenFit.portraitPixels)
+        #expect(phoneWishes[0].spec.serials == [200_000_108, 200_000_118, 200_000_128])
+        #expect(phoneWishes[0].spec.name == "Snug 手机屏")
+        #expect(tabletWishes[0].spec.productID == ScreenSpec.landscapeProductID)
+        #expect(tabletWishes[0].spec.maxPixels == ScreenFit.landscapePixels)
     }
 
-    @Test("设为主屏的那块标出来，最多一块")
+    @Test("真实远程停用设为主屏，不能绕过旁路或额外搬窗口；显式预览仍保留旧行为")
     func main() {
         var c = config()
         c.mainScreen = c.screens[1].id
-        let wishes = ScreenPlan.wishes(config: c, remote: remote, trusted: true)
-        #expect(wishes.map(\.main) == [false, true])
-    }
-
-    @Test("设为主屏的那块常驻：不在远程也要它，别的屏照旧只在远程时要；关着、没有辅助功能权限时不要")
-    func persistentMain() {
-        var c = config()
-        c.mainScreen = c.screens[1].id
-        let idle = ScreenPlan.wishes(config: c, remote: false, trusted: true)
-        #expect(idle.map(\.id) == [c.screens[1].id])
-        #expect(idle.map(\.main) == [true])
-        #expect(ScreenPlan.wishes(config: c, remote: false, trusted: false).isEmpty)
-        c.screens[1].enabled = false
-        #expect(ScreenPlan.wishes(config: c, remote: false, trusted: true).isEmpty)
+        #expect(ScreenPlan.wishes(config: c, remote: remote, controllers: [tablet], trusted: true).map(\.main) == [false])
+        #expect(ScreenPlan.wishes(config: c, remote: remote, controllers: [legion], trusted: true).isEmpty)
+        #expect(ScreenPlan.wishes(config: c, remote: false, controllers: [], trusted: true).isEmpty)
+        #expect(ScreenPlan.wishes(config: c, remote: false, controllers: [], trusted: true, preview: true).map(\.main) == [false, true, false])
     }
 
     @Test("加到上限就不再加；手改配置开了更多块：只建前 4 块")
@@ -86,7 +105,7 @@ struct ScreenPlanTests {
         for _ in 1..<ScreenConfig.limit { #expect(c.addScreen(orientation: .portrait, device: .standard) != nil) }
         #expect(c.addScreen(orientation: .portrait, device: .standard) == nil)
         c.screens.append(ScreenConfig(id: .make(), orientation: .portrait, device: .standard, enabled: true, name: "手改的", serials: [1]))
-        #expect(ScreenPlan.wishes(config: c, remote: remote, trusted: true).count == ScreenConfig.limit)
+        #expect(ScreenPlan.wishes(config: c, remote: false, controllers: [], trusted: true, preview: true).count == ScreenConfig.limit)
     }
 }
 

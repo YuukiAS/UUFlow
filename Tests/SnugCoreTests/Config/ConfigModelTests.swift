@@ -4,10 +4,11 @@ import Testing
 
 @Suite("配置 AppConfig")
 struct ConfigModelTests {
-    @Test("默认值：只有一块开着的竖屏手机屏（17 Pro Max），不改主屏；手势开着，截图键关着，字号默认放大 2 级，还没看过欢迎页，从腾讯云更新")
+    @Test("默认值：只有一块开着的竖屏手机屏（17 Pro Max），没有控制端绑定、不改主屏；手势开着，截图键关着，字号默认放大 2 级，还没看过欢迎页，从腾讯云更新")
     func defaults() {
         let c = AppConfig()
         #expect(c.screens == [.legacyPhone(.standard, enabled: true)])
+        #expect(c.controllerBindings.isEmpty)
         #expect(c.mainScreen == nil)
         #expect(c.gestures)
         #expect(!c.screenshot)
@@ -173,6 +174,29 @@ struct ConfigModelTests {
         #expect(c.mainScreen == nil)
     }
 
+    @Test("控制端绑定写盘后可读回；删掉被绑定的屏后保留为旁路，不留下悬空屏号")
+    func controllerBindingsRoundTripAndRemoval() throws {
+        var c = AppConfig()
+        let tablet = c.addScreen(orientation: .landscape, device: DeviceChoice(model: nil, screen: DeviceScreen(width: 1640, height: 2360), kind: .tablet))!
+        c.bindController("LEGION-Y9000P", to: nil)
+        c.bindController("Alice iPad", to: tablet.id)
+        let loaded = try JSONDecoder().decode(AppConfig.self, from: JSONEncoder().encode(c))
+        #expect(loaded.controllerBindings == c.controllerBindings)
+        #expect(loaded.binding(for: "LEGION-Y9000P")?.screen == nil)
+        #expect(loaded.binding(for: "Alice iPad")?.screen == tablet.id)
+
+        c.removeScreen(tablet.id)
+        #expect(c.binding(for: "Alice iPad")?.screen == nil)
+        #expect(!c.controllerBindings.contains { $0.screen == tablet.id })
+    }
+
+    @Test("配置中的空名称、重复名称和悬空屏号会安全收敛；悬空绑定变成旁路")
+    func sanitizesControllerBindings() throws {
+        let json = #"{"screens":[{"id":"phone","orientation":"portrait","device":{"screen":{"width":1320,"height":2868,"points":440},"kind":"phone"},"enabled":true,"name":"Snug 手机屏","serials":[200000108]}],"controllerBindings":[{"name":"","screen":"phone"},{"name":"Neo","screen":"missing"},{"name":"Neo","screen":"phone"}]}"#
+        let c = try decode(json)
+        #expect(c.controllerBindings == [ControllerBinding(name: "Neo", screen: nil)])
+    }
+
     @Test("手改坏了的屏幕列表：分辨率不对、没有序列号、id 重复的那一项丢掉；主屏指向没有的屏当作不改")
     func sanitizesScreens() throws {
         let good = #"{"id":"a","orientation":"landscape","device":{"screen":{"width":1080,"height":1920},"kind":"computer"},"enabled":true,"name":"A","serials":[1,2,3]}"#
@@ -230,6 +254,8 @@ struct ConfigModelTests {
         var c = AppConfig()
         c.screens[0].enabled = false
         c.mainScreen = .phone
+        c.bindController("LEGION-Y9000P", to: nil)
+        c.bindController("MacBook Neo", to: .phone)
         c.screenshot = true
         c.zoomSteps = 3
         c.welcomed = true

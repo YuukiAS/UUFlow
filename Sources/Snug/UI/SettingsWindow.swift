@@ -1,5 +1,5 @@
 // 设置窗口：macOS 设置窗口的样式，顶部工具栏分三页（界面以 design/prototype 为准）：
-// - 屏幕：此刻的远程状态，要处理的问题各一行；屏幕列表（开关、在看、ⓘ 进详情）、添加屏幕、设为主屏
+// - 屏幕：此刻的远程状态，要处理的问题各一行；控制端规则；屏幕列表（开关、在看、ⓘ 进详情）和添加屏幕
 // - 触控：手势、字号放大、截图，写明只作用于手机和平板屏
 // - 通用：开机启动、权限、软件更新和更新源、退出 Snug
 // 只管某一块屏的（型号、名字、删除）放进那块屏的详情（见 ScreenSheets）。只读 AppState，意图走 AppIntents。
@@ -17,9 +17,12 @@ struct ScreensPage: View {
     let navigation: any Navigation
     /// 打开着的表单：添加屏幕、某块屏的详情（渲染样例用初值）
     @State var sheet: ScreenSheet?
-    @State private var explaining = false
-    /// 选了要设为主屏、等确认的那块（渲染样例用初值）
-    @State var confirmingMain: ScreenID?
+
+    private var controllerNames: [String] {
+        var names = state.config.controllerBindings.map(\.name)
+        for name in state.controllers where !names.contains(name) { names.append(name) }
+        return names
+    }
 
     var body: some View {
         Form {
@@ -27,6 +30,21 @@ struct ScreensPage: View {
             let issues = Issue.all(state, intents)
             if !issues.isEmpty {
                 Section { ForEach(issues) { IssueRow(issue: $0) } }
+            }
+            Section {
+                if controllerNames.isEmpty {
+                    Text("连接一次后，这里会显示 UU远程 读到的控制端名称。")
+                        .foregroundStyle(.secondary)
+                } else {
+                    ForEach(controllerNames, id: \.self) { name in
+                        ControllerBindingRow(name: name, connected: state.controllers.contains(name), state: state, intents: intents)
+                    }
+                }
+            } header: {
+                Text("控制端规则")
+            } footer: {
+                Text("未配置、读不到名称或同时出现多个名称时，UUFlow 默认旁路，不创建虚拟屏。")
+                    .font(.callout).foregroundStyle(.secondary)
             }
             Section {
                 ForEach(state.config.screens) { screen in
@@ -41,35 +59,14 @@ struct ScreensPage: View {
                 Text("屏幕")
             } footer: {
                 HStack(alignment: .firstTextBaseline, spacing: MacTokens.Space.s) {
-                    HStack(spacing: MacTokens.Space.xs) {
-                        Text("同一时间只用到一块屏，用不到的可以关掉。").foregroundStyle(.secondary)
-                        Button("为什么？") { explaining = true }
-                            .buttonStyle(.link)
-                            .popover(isPresented: $explaining, arrowEdge: .bottom) { WhyManyScreens() }
-                    }
-                    .font(.callout)
+                    Text("每个控制端只创建绑定的一块屏；关闭的屏不会创建。")
+                        .font(.callout).foregroundStyle(.secondary)
                     Spacer(minLength: MacTokens.Space.m)
                     Button { sheet = .add } label: { Label("添加屏幕…", systemImage: "plus") }
                         .disabled(state.config.screens.count >= ScreenConfig.limit)
                         .help(state.config.screens.count >= ScreenConfig.limit ? "最多 \(ScreenConfig.limit) 块" : "")
                 }
                 .padding(.top, MacTokens.Space.xs)
-            }
-            Section {
-                LabeledContent {
-                    // 设主屏立即生效、影响本机，先讲清代价再设；改回「不改」不用问
-                    Picker("设为主屏", selection: Binding(get: { state.config.mainScreen }, set: { id in
-                        if let id, id != state.config.mainScreen { confirmingMain = id } else { intents.setMainScreen(id) }
-                    })) {
-                        Text("不改").tag(ScreenID?.none)
-                        Divider()
-                        ForEach(state.config.screens) { Text($0.name).tag(ScreenID?.some($0.id)) }
-                    }
-                    .labelsHidden()
-                    .fixedSize()
-                } label: {
-                    SettingLabel("设为主屏", detail: "常驻并作为主屏，每次连接直接进入", tile: MacTokens.IconTile.mainScreen)
-                }
             }
         }
         .formStyle(.grouped)
@@ -81,27 +78,46 @@ struct ScreensPage: View {
             case .detail(let id): ScreenDetailSheet(id: id, state: state, intents: intents) { self.sheet = nil }
             }
         }
-        .confirmationDialog(confirmingMain.flatMap { state.screen($0) }.map { "将「\($0.name)」设为主屏？" } ?? "",
-                            isPresented: Binding(get: { confirmingMain != nil }, set: { if !$0 { confirmingMain = nil } })) {
-            Button("设为主屏") {
-                if let id = confirmingMain { intents.setMainScreen(id) }
-                confirmingMain = nil
-            }
-        } message: {
-            Text(MainScreenNotice.detail)
-        }
     }
 }
 
-/// 设为主屏的代价：设置里确认时讲清楚（README「设为主屏」同一套说法）
-enum MainScreenNotice {
-    static let detail = """
-        此屏将常驻并作为 Mac 的主屏，立即生效；UU远程 每次连接即进入此屏。
+private struct ControllerBindingRow: View {
+    private enum Selection: Hashable {
+        case unconfigured
+        case bypass
+        case screen(ScreenID)
+    }
 
-        影响：当前主屏上的窗口随即移至此屏；此后程序坞、新窗口、系统提示与锁屏登录框均显示于此屏，本机不可见。适用于未接显示器或仅远程使用的 Mac。
+    let name: String
+    let connected: Bool
+    let state: AppState
+    let intents: any AppIntents
 
-        原因：UU远程 在连接时选定主屏，Snug 仅能在连接后察觉，须预先设定。可随时在 App 资源库或菜单栏取消。
-        """
+    var body: some View {
+        LabeledContent {
+            Picker("处理方式", selection: Binding(get: {
+                guard let binding = state.config.binding(for: name) else { return Selection.unconfigured }
+                return binding.screen.map(Selection.screen) ?? .bypass
+            }, set: { selection in
+                switch selection {
+                case .unconfigured: break
+                case .bypass: intents.bindController(name, to: nil)
+                case .screen(let id): intents.bindController(name, to: id)
+                }
+            })) {
+                Text("旁路（默认）").tag(Selection.unconfigured)
+                Text("始终旁路").tag(Selection.bypass)
+                Divider()
+                ForEach(state.config.screens) { screen in
+                    Text(screen.name).tag(Selection.screen(screen.id))
+                }
+            }
+            .labelsHidden()
+            .fixedSize()
+        } label: {
+            SettingLabel(name, detail: connected ? "当前连接" : "已记录", tile: MacTokens.IconTile.screen(symbol: "network"))
+        }
+    }
 }
 
 /// 设置窗口上弹出的表单
@@ -147,31 +163,6 @@ private struct WatchingBadge: LabelStyle {
         HStack(spacing: MacTokens.Space.xs) {
             configuration.icon.font(.system(size: 6)).foregroundStyle(MacTokens.Color.positive)
             configuration.title.font(.callout).foregroundStyle(.secondary)
-        }
-    }
-}
-
-/// 「为什么？」的气泡：多开的屏留给什么
-private struct WhyManyScreens: View {
-    var body: some View {
-        VStack(alignment: .leading, spacing: MacTokens.Space.m) {
-            Text("可以开几块屏").font(.headline)
-            Text("UU远程 一次只让一台设备控制。多开的屏留给：").foregroundStyle(.secondary)
-            reason("rectangle.portrait.rotate", "横竖切换", "同一台设备横竖各一块，转过来在 UU 里切")
-            reason("arrow.left.arrow.right", "换设备", "另一台接管后直接选它的屏，不用改设置")
-            Text("关着的屏远程时不建，UU 的屏幕列表也更短。").font(.callout).foregroundStyle(.secondary)
-        }
-        .padding(MacTokens.Space.l)
-        .frame(width: MacTokens.Size.helpPopoverWidth, alignment: .leading)
-    }
-
-    private func reason(_ symbol: String, _ title: String, _ detail: String) -> some View {
-        HStack(alignment: .firstTextBaseline, spacing: MacTokens.Space.s) {
-            Image(systemName: symbol).foregroundStyle(MacTokens.Color.accent).frame(width: 20)
-            VStack(alignment: .leading, spacing: MacTokens.Space.xxs) {
-                Text(title).fontWeight(.medium)
-                Text(detail).font(.callout).foregroundStyle(.secondary)
-            }
         }
     }
 }

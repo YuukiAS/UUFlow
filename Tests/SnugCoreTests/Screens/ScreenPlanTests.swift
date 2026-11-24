@@ -1,3 +1,4 @@
+import CoreGraphics
 import Testing
 @testable import SnugCore
 
@@ -148,7 +149,7 @@ struct DeviceRoutingTests {
                 orientation: .landscape,
                 device: DeviceChoice(
                     model: nil,
-                    screen: DeviceScreen(width: 800, height: 1280),
+                    screen: DeviceScreen(width: 720, height: 1280),
                     kind: .computer
                 ),
                 name: "ThinkPad E16",
@@ -218,7 +219,7 @@ struct DeviceRoutingTests {
         #expect(ipad.map(\.behavior) == [.touchScreen])
     }
 
-    @Test("ThinkPad 只创建 1280×800 电脑屏，不带出手机或 iPad 屏")
+    @Test("ThinkPad 只创建 1280×720 电脑屏，不带出手机或 iPad 屏")
     func thinkPadComputerBehavior() throws {
         let c = config()
         let wishes = ScreenPlan.wishes(config: c, remote: true, controllers: [thinkPadName], trusted: true)
@@ -227,7 +228,9 @@ struct DeviceRoutingTests {
         #expect(wish.id == thinkPadID)
         #expect(wish.behavior == .computer)
         #expect(c.screens[2].orientation == .landscape)
-        #expect(c.screens[2].device.screen == DeviceScreen(width: 800, height: 1280))
+        #expect(c.screens[2].device.screen == DeviceScreen(width: 720, height: 1280))
+        #expect(wish.fit.baseWidth == 1280)
+        #expect(wish.fit.size(width: wish.fit.baseWidth) == CGSize(width: 1280, height: 720))
     }
 }
 

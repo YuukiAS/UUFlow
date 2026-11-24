@@ -215,7 +215,7 @@ struct ConfigModelTests {
         let ipad = try #require(added)
         let computer = c.addScreen(
             orientation: .landscape,
-            device: DeviceChoice(model: nil, screen: DeviceScreen(width: 800, height: 1280), kind: .computer),
+            device: DeviceChoice(model: nil, screen: DeviceScreen(width: 720, height: 1280), kind: .computer),
             name: "ThinkPad E16"
         )
         let thinkPad = try #require(computer)
@@ -227,6 +227,7 @@ struct ConfigModelTests {
         #expect(loaded.binding(for: onePlusName)?.screen == .phone)
         #expect(loaded.binding(for: ipadName)?.screen == ipad.id)
         #expect(loaded.binding(for: thinkPadName)?.screen == thinkPad.id)
+        #expect(loaded.screens.first { $0.id == thinkPad.id }?.device.screen == DeviceScreen(width: 720, height: 1280))
 
         c.removeScreen(thinkPad.id)
         #expect(c.binding(for: thinkPadName)?.screen == nil)

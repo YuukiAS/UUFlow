@@ -190,6 +190,40 @@ struct ConfigModelTests {
         #expect(!c.controllerBindings.contains { $0.screen == tablet.id })
     }
 
+    @Test("一加 12 与 iPad Air 的真实名称映射可持久化；删屏后对应映射失效")
+    func phoneTabletBindingsRoundTripAndRemoval() throws {
+        let onePlusName = "一加 12 全网通版"
+        let ipadName = "iPad Air 5"
+        var c = AppConfig()
+        c.screens[0] = ScreenConfig(
+            id: .phone,
+            orientation: .landscape,
+            device: DeviceChoice(model: "一加 12", screen: DeviceScreen(width: 1440, height: 3168), kind: .phone),
+            name: "Snug 一加 12 横屏",
+            serials: [1]
+        )
+        let added = c.addScreen(
+            orientation: .landscape,
+            device: DeviceChoice(
+                model: "Apple iPad Air（第 5 代）",
+                screen: DeviceScreen(width: 1640, height: 2360, points: 820),
+                kind: .tablet
+            ),
+            name: "iPad Air M1"
+        )
+        let ipad = try #require(added)
+        c.bindController(onePlusName, to: .phone)
+        c.bindController(ipadName, to: ipad.id)
+
+        let loaded = try JSONDecoder().decode(AppConfig.self, from: JSONEncoder().encode(c))
+        #expect(loaded.binding(for: onePlusName)?.screen == .phone)
+        #expect(loaded.binding(for: ipadName)?.screen == ipad.id)
+
+        c.removeScreen(ipad.id)
+        #expect(c.binding(for: ipadName)?.screen == nil)
+        #expect(c.binding(for: onePlusName)?.screen == .phone)
+    }
+
     @Test("配置中的空名称、重复名称和悬空屏号会安全收敛；悬空绑定变成旁路")
     func sanitizesControllerBindings() throws {
         let json = #"{"screens":[{"id":"phone","orientation":"portrait","device":{"screen":{"width":1320,"height":2868,"points":440},"kind":"phone"},"enabled":true,"name":"Snug 手机屏","serials":[200000108]}],"controllerBindings":[{"name":"","screen":"phone"},{"name":"Neo","screen":"missing"},{"name":"Neo","screen":"phone"}]}"#

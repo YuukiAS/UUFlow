@@ -109,6 +109,95 @@ struct ScreenPlanTests {
     }
 }
 
+@Suite("一加 12 与 iPad Air M1 精确路由")
+struct PhoneTabletRoutingTests {
+    private let onePlusName = "一加 12 全网通版"
+    private let ipadName = "iPad Air 5"
+    private let onePlusID = ScreenID("oneplus-landscape")
+    private let ipadID = ScreenID("ipad-air-m1")
+
+    private func config() -> AppConfig {
+        var c = AppConfig()
+        c.screens = [
+            ScreenConfig(
+                id: onePlusID,
+                orientation: .landscape,
+                device: DeviceChoice(
+                    model: "一加 12",
+                    screen: DeviceScreen(width: 1440, height: 3168),
+                    kind: .phone
+                ),
+                name: "Snug 一加 12 横屏",
+                serials: [1]
+            ),
+            ScreenConfig(
+                id: ipadID,
+                orientation: .landscape,
+                device: DeviceChoice(
+                    model: "Apple iPad Air（第 5 代）",
+                    screen: DeviceScreen(width: 1640, height: 2360, points: 820),
+                    kind: .tablet
+                ),
+                name: "iPad Air M1",
+                serials: [2]
+            ),
+        ]
+        c.bindController(onePlusName, to: onePlusID)
+        c.bindController(ipadName, to: ipadID)
+        return c
+    }
+
+    private func selected(_ controllers: [String], remote: Bool = true, config: AppConfig? = nil) -> [ScreenID] {
+        ScreenPlan.wishes(
+            config: config ?? self.config(),
+            remote: remote,
+            controllers: controllers,
+            trusted: true
+        ).map(\.id)
+    }
+
+    @Test("两个真实名称各只选中自己的屏")
+    func exactNames() {
+        #expect(selected([onePlusName]) == [onePlusID])
+        #expect(selected([ipadName]) == [ipadID])
+    }
+
+    @Test("一加与 iPad 双向接管时，结果只跟当前控制端走")
+    func takeoverBothWays() {
+        #expect([selected([onePlusName]), selected([ipadName]), selected([onePlusName])] == [[onePlusID], [ipadID], [onePlusID]])
+        #expect([selected([ipadName]), selected([onePlusName]), selected([ipadName])] == [[ipadID], [onePlusID], [ipadID]])
+    }
+
+    @Test("未识别、未绑定、多个名称及其他设备都旁路")
+    func defaultsToBypass() {
+        #expect(selected([]).isEmpty)
+        #expect(selected(["未绑定设备"]).isEmpty)
+        #expect(selected(["THINKPAD-E16"]).isEmpty)
+        #expect(selected([onePlusName, ipadName]).isEmpty)
+    }
+
+    @Test("目标关闭或远程断开时不创建屏")
+    func disabledOrDisconnected() {
+        var c = config()
+        c.screens[0].enabled = false
+        #expect(selected([onePlusName], config: c).isEmpty)
+        c.screens[0].enabled = true
+        c.screens[1].enabled = false
+        #expect(selected([ipadName], config: c).isEmpty)
+        #expect(selected([onePlusName], remote: false, config: c).isEmpty)
+        #expect(selected([ipadName], remote: false, config: c).isEmpty)
+    }
+
+    @Test("手机屏与 iPad 屏都保持触屏行为")
+    func touchBehavior() {
+        let c = config()
+        let onePlus = ScreenPlan.wishes(config: c, remote: true, controllers: [onePlusName], trusted: true)
+        let ipad = ScreenPlan.wishes(config: c, remote: true, controllers: [ipadName], trusted: true)
+        #expect(onePlus.map(\.behavior) == [.touchScreen])
+        #expect(ipad.map(\.behavior) == [.touchScreen])
+    }
+}
+
 @Suite("屏幕列表 ScreenConfig")
 struct ScreenConfigTests {
     @Test("按型号起名：去掉代际和尺寸；每类设备平常的方向不加后缀，反过来的写明横竖；自己填的、通用分辨率按类别叫")

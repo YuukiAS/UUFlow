@@ -109,12 +109,14 @@ struct ScreenPlanTests {
     }
 }
 
-@Suite("一加 12 与 iPad Air M1 精确路由")
-struct PhoneTabletRoutingTests {
+@Suite("一加 12、iPad Air M1 与 ThinkPad E16 精确路由")
+struct DeviceRoutingTests {
     private let onePlusName = "一加 12 全网通版"
     private let ipadName = "iPad Air 5"
+    private let thinkPadName = "THINKPAD-E16"
     private let onePlusID = ScreenID("oneplus-landscape")
     private let ipadID = ScreenID("ipad-air-m1")
+    private let thinkPadID = ScreenID("thinkpad-e16")
 
     private func config() -> AppConfig {
         var c = AppConfig()
@@ -141,9 +143,21 @@ struct PhoneTabletRoutingTests {
                 name: "iPad Air M1",
                 serials: [2]
             ),
+            ScreenConfig(
+                id: thinkPadID,
+                orientation: .landscape,
+                device: DeviceChoice(
+                    model: nil,
+                    screen: DeviceScreen(width: 800, height: 1280),
+                    kind: .computer
+                ),
+                name: "ThinkPad E16",
+                serials: [3]
+            ),
         ]
         c.bindController(onePlusName, to: onePlusID)
         c.bindController(ipadName, to: ipadID)
+        c.bindController(thinkPadName, to: thinkPadID)
         return c
     }
 
@@ -156,23 +170,26 @@ struct PhoneTabletRoutingTests {
         ).map(\.id)
     }
 
-    @Test("两个真实名称各只选中自己的屏")
+    @Test("三个真实名称各只选中自己的屏")
     func exactNames() {
         #expect(selected([onePlusName]) == [onePlusID])
         #expect(selected([ipadName]) == [ipadID])
+        #expect(selected([thinkPadName]) == [thinkPadID])
     }
 
     @Test("一加与 iPad 双向接管时，结果只跟当前控制端走")
     func takeoverBothWays() {
         #expect([selected([onePlusName]), selected([ipadName]), selected([onePlusName])] == [[onePlusID], [ipadID], [onePlusID]])
         #expect([selected([ipadName]), selected([onePlusName]), selected([ipadName])] == [[ipadID], [onePlusID], [ipadID]])
+        #expect([selected([thinkPadName]), selected([onePlusName])] == [[thinkPadID], [onePlusID]])
+        #expect([selected([onePlusName]), selected([thinkPadName])] == [[onePlusID], [thinkPadID]])
     }
 
     @Test("未识别、未绑定、多个名称及其他设备都旁路")
     func defaultsToBypass() {
         #expect(selected([]).isEmpty)
         #expect(selected(["未绑定设备"]).isEmpty)
-        #expect(selected(["THINKPAD-E16"]).isEmpty)
+        #expect(selected(["LEGION-Y9000P"]).isEmpty)
         #expect(selected([onePlusName, ipadName]).isEmpty)
     }
 
@@ -184,8 +201,12 @@ struct PhoneTabletRoutingTests {
         c.screens[0].enabled = true
         c.screens[1].enabled = false
         #expect(selected([ipadName], config: c).isEmpty)
+        c.screens[1].enabled = true
+        c.screens[2].enabled = false
+        #expect(selected([thinkPadName], config: c).isEmpty)
         #expect(selected([onePlusName], remote: false, config: c).isEmpty)
         #expect(selected([ipadName], remote: false, config: c).isEmpty)
+        #expect(selected([thinkPadName], remote: false, config: c).isEmpty)
     }
 
     @Test("手机屏与 iPad 屏都保持触屏行为")
@@ -195,6 +216,18 @@ struct PhoneTabletRoutingTests {
         let ipad = ScreenPlan.wishes(config: c, remote: true, controllers: [ipadName], trusted: true)
         #expect(onePlus.map(\.behavior) == [.touchScreen])
         #expect(ipad.map(\.behavior) == [.touchScreen])
+    }
+
+    @Test("ThinkPad 只创建 1280×800 电脑屏，不带出手机或 iPad 屏")
+    func thinkPadComputerBehavior() throws {
+        let c = config()
+        let wishes = ScreenPlan.wishes(config: c, remote: true, controllers: [thinkPadName], trusted: true)
+        #expect(wishes.count == 1)
+        let wish = try #require(wishes.first)
+        #expect(wish.id == thinkPadID)
+        #expect(wish.behavior == .computer)
+        #expect(c.screens[2].orientation == .landscape)
+        #expect(c.screens[2].device.screen == DeviceScreen(width: 800, height: 1280))
     }
 }
 

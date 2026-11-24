@@ -190,10 +190,11 @@ struct ConfigModelTests {
         #expect(!c.controllerBindings.contains { $0.screen == tablet.id })
     }
 
-    @Test("一加 12 与 iPad Air 的真实名称映射可持久化；删屏后对应映射失效")
-    func phoneTabletBindingsRoundTripAndRemoval() throws {
+    @Test("一加、iPad 与 ThinkPad 的真实名称映射可持久化；删屏后对应映射失效")
+    func deviceBindingsRoundTripAndRemoval() throws {
         let onePlusName = "一加 12 全网通版"
         let ipadName = "iPad Air 5"
+        let thinkPadName = "THINKPAD-E16"
         var c = AppConfig()
         c.screens[0] = ScreenConfig(
             id: .phone,
@@ -212,16 +213,25 @@ struct ConfigModelTests {
             name: "iPad Air M1"
         )
         let ipad = try #require(added)
+        let computer = c.addScreen(
+            orientation: .landscape,
+            device: DeviceChoice(model: nil, screen: DeviceScreen(width: 800, height: 1280), kind: .computer),
+            name: "ThinkPad E16"
+        )
+        let thinkPad = try #require(computer)
         c.bindController(onePlusName, to: .phone)
         c.bindController(ipadName, to: ipad.id)
+        c.bindController(thinkPadName, to: thinkPad.id)
 
         let loaded = try JSONDecoder().decode(AppConfig.self, from: JSONEncoder().encode(c))
         #expect(loaded.binding(for: onePlusName)?.screen == .phone)
         #expect(loaded.binding(for: ipadName)?.screen == ipad.id)
+        #expect(loaded.binding(for: thinkPadName)?.screen == thinkPad.id)
 
-        c.removeScreen(ipad.id)
-        #expect(c.binding(for: ipadName)?.screen == nil)
+        c.removeScreen(thinkPad.id)
+        #expect(c.binding(for: thinkPadName)?.screen == nil)
         #expect(c.binding(for: onePlusName)?.screen == .phone)
+        #expect(c.binding(for: ipadName)?.screen == ipad.id)
     }
 
     @Test("配置中的空名称、重复名称和悬空屏号会安全收敛；悬空绑定变成旁路")

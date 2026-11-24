@@ -1,200 +1,132 @@
 # UUFlow Roadmap
 
-UUFlow 基于 [zephyr4123/snug](https://github.com/zephyr4123/snug) 的 MIT 许可代码继续开发。上游已经解决 UU远程 被控 Mac 上的虚拟屏、窗口管理、手机/平板触控和 App 资源库；UUFlow 的新增目标是把电脑控制端也做成更接近本机的操作体验。
+UUFlow 基于 [zephyr4123/snug](https://github.com/zephyr4123/snug) 的 MIT 许可代码继续开发。上游已经解决被控 Mac 上的虚拟屏、窗口管理、UU远程 会话识别、手机/平板触控和 App 资源库；UUFlow 在此基础上补齐“不同控制端得到不同远控体验”和电脑控制端的本机 / 远端输入切换。
 
 ## 产品边界
 
-最终形态分为三层：
+最终形态分三端：
 
-- **Mac mini / 被控 Mac**：安装 UUFlow 主体。负责 Snug 已有的虚拟屏、窗口管理、UU 会话识别、手机和平板触控增强，以及以后需要的被控端能力。
-- **MacBook / macOS 控制端**：安装轻量 Controller。只负责 LOCAL / REMOTE 输入路由，让同一套快捷键和后续触控板手势按需作用于本机或远程 Mac。
-- **Windows 控制端**：安装轻量 Controller，职责与 macOS Controller 相同。
-- **手机 / iPad / Android 平板**：只安装 UU远程，不安装 UUFlow Controller。继续使用 UUFlow 主体提供的专属虚拟屏、触控和 App 资源库。
+- **Mac mini / 被控 Mac**：安装 UUFlow 主体。负责虚拟屏、窗口管理、UU 会话与控制端识别、手机/平板触控增强，以及按控制端选择对应屏幕或旁路。
+- **macOS 电脑控制端**：安装轻量 Controller。负责本机 / 远端输入模式，让同一套快捷键和后续触控板手势按需作用于控制端本机或远程 Mac。
+- **Windows 电脑控制端**：安装轻量 Controller，职责与 macOS Controller 相同。
+- **手机 / iPad / Android 平板**：只安装 UU远程，不安装 Controller；由 Mac mini 上的 UUFlow 提供专属虚拟屏、触控和 App 资源库。
 
-Controller 不复制 Snug 的虚拟屏和窗口管理能力，也不自建远控协议；远程画面、键鼠传输仍由 UU远程负责。
-
----
-
-## Phase 0：先部署现有 fork，确认 Snug 基线值不值得保留
-
-这一阶段不开发 Controller，也不改触控板。
-
-在 Mac mini 上直接用当前 UUFlow fork：
-
-1. 跑完整现有构建与测试，确认 fork 基线健康。
-2. 构建并安装当前 App。
-3. 授予现有功能真正需要的权限，不提前申请后续 Controller 权限。
-4. 建立至少以下几块测试屏：
-   - MacBook Neo；
-   - ThinkPad；
-   - 手机；
-   - iPad / 平板。
-5. 用真实 UU远程分别测试：
-   - Neo / ThinkPad 画面是否铺满、比例和字号是否明显优于直接远控主屏；
-   - 多屏切换是否稳定；
-   - App 资源库能否把别的屏幕上的窗口拉到当前远程屏，并正确还原；
-   - 手机和平板的单指滚动、长按右键、拖选文字是否符合预期；
-   - 断线、重连、退出 UUFlow 后窗口和显示器是否恢复正常。
-
-本阶段的目标是回答一个问题：
-
-> 上游 Snug 的显示、窗口和移动端触控能力是否值得作为 UUFlow 的长期底座？
-
-如果通过，这部分尽量少改，后续优先保持与上游可同步。
-
-### Phase 0 当前现场
-
-当前 fork 已经在 Mac mini 完成安装。继续通过 Legion Y9000P 使用 UU远程时，现有 Snug 逻辑会因为“远程中就创建所有已启用虚拟屏”改变显示拓扑，已经影响正常 Legion 远控，因此 Phase 0 的继续实测已中断。
-
-在下一项修复完成前：
-
-- 不把当前 UUFlow 作为 Mac mini 常驻远控组件运行；
-- 正在依赖 Legion 远控时，不重新安装或启动会创建虚拟屏的版本；
-- 可以继续做源码修改和离线测试；
-- 真实安装、连接、切换设备验收放在用户位于 Mac mini 旁边，或明确接受远控暂时中断的测试窗口。
+UUFlow 不复制 UU远程 的传输协议。远程画面与键鼠传输继续由 UU远程负责。
 
 ---
 
-## Phase 0.5：按控制端决定是否介入和创建哪块屏
+## Phase 1：设备专属屏与自动路由
 
-这是当前最高优先级 TODO，必须在 macOS / Windows Controller 之前完成。
+目标是让不同控制端连接同一台 Mac mini 时得到各自合适的屏幕；不需要增强显示的设备保持原来的 UU远程 体验。
 
-现有实现已经能从 UU远程“本机被控中”页面读取控制端名称，并通过 `RemoteObservation.controllers`、`RemoteSession.controllers` 传到核心；缺口在 `ScreenPlan`：它当前完全忽略控制端名称，只要进入远程会话就创建所有已启用屏幕。
+### 路由规则
 
-目标行为：
+UUFlow 复用现有“本机被控中”控制端读取能力，根据 UU 实际报告的控制端名称决定：
 
-- **Legion Y9000P**：完全旁路 UUFlow 显示增强。不创建虚拟屏、不搬窗口、不改变 Mac mini 显示拓扑，继续使用 UU远程看到的原主屏。
-- **手机**：只创建绑定的手机屏，启用手机比例、字号、触控翻译和 App 资源库。
-- **iPad / 平板**：只创建绑定的平板屏，启用平板布局、触控和 App 资源库。
-- **MacBook Neo**：只创建绑定的电脑屏，使用 Neo 对应分辨率；电脑屏不做手机/平板触控翻译。后续 LOCAL / REMOTE 键盘和触控板仍由 Controller 负责。
-- **未识别控制端**：默认旁路，不创建任何 UUFlow 虚拟屏，也不改变现有远控体验。
+- 绑定到某块屏：只创建该屏；
+- 配置为旁路：不创建 UUFlow 虚拟屏；
+- 名称未识别、未绑定、映射冲突或目标屏不可用：默认旁路。
 
-实现边界：
+屏幕选择只由这一套路由决定，不再因为“远程中”就创建所有 enabled 屏。控制端名称到屏幕的判断集中在屏幕策略层，不再新增第二套设备识别或会话状态机。
 
-1. 继续复用现有 UU 控制端识别，不新增第二套识别机制。
-2. 在配置层增加“控制端名称 → 对应屏幕 / 旁路”的用户规则。
-3. 屏幕选择策略仍集中在 `ScreenPlan`，设备判断不散进 UI、`DeskSet` 或 UU 适配器。
-4. `AppController` 只负责把当前会话的控制端信息交给屏幕策略。
-5. 每个控制端只得到自己绑定的屏，不再因为远程开始就创建全部 enabled 屏。
-6. `--preview-screens` 继续用于本机预览，不受真实控制端规则限制。
-7. 重新核对“设为主屏”与设备规则的关系，不能让 Legion 旁路被常驻主屏绕过。
-8. 本阶段不开发 AltTab Controller，也不开发触控板手势。
+### 当前设备
 
-先用纯逻辑测试钉住：
+- **一加 12**：专属横屏已配置并完成自动路由。UU 实际名称为“一加 12 全网通版”。
+- **iPad Air M1**：按 iPad Air 第 5 代配置横屏，1640×2360、points 820；自动路由已完成。UU 实际名称为“iPad Air 5”。
+- **MacBook Neo**：电脑横屏已经准备，自定义逻辑分辨率 1408×881、无刘海。自动路由留到下一次 Neo 在场时完成，不阻塞其他设备。
+- **ThinkPad E16**：面板为 2560×1600、16:10。专属电脑屏采用自定义逻辑分辨率 **1280×800** 作为基准：与 Windows 200% 缩放的逻辑工作区一致，2 倍模式正好对应 2560×1600；Snug 仍可提供更宽档位，需要更多工作区时可再调高。Windows 当前 225% 只作为本机文字大小偏好的参考，不把 1138×711 这种非整数缩放结果写成固定虚拟屏规格。
+- **Legion Y9000P**：保持旁路，不创建 UUFlow 虚拟屏，不改变 Mac mini 显示拓扑。
 
-- Legion → 0 块屏；
-- 手机 → 只手机屏；
-- iPad → 只平板屏；
-- Neo → 只 Neo 电脑屏；
-- 未识别 → 0 块屏；
-- 控制端接管/切换后只保留新控制端对应屏；
-- preview 仍可正常预览；
-- 原有手机/平板/电脑行为映射保持不变。
+### Phase 1 完成标准
 
-最后再做实机验收：
+1. 一加连接时只出现一加屏；
+2. iPad 连接时只出现 iPad 屏；
+3. Neo 连接时只出现 Neo 电脑屏；
+4. ThinkPad 连接时只出现 ThinkPad 电脑屏；
+5. Legion 连接时保持旁路；
+6. 未识别或未绑定设备保持旁路；
+7. 设备接管时旧屏撤掉、新设备对应屏按路由建立；
+8. 断开后窗口和显示器按现有 Snug 机制恢复；
+9. 手机、平板继续使用触控增强；电脑屏保持普通显示器行为；
+10. `mainScreen` 默认保持为空，不依赖常驻虚拟主屏实现路由。
 
-1. Legion 连接时显示拓扑完全不变；
-2. 手机连接只出现手机屏；
-3. iPad 连接只出现平板屏；
-4. Neo 连接只出现 Neo 电脑屏；
-5. 断开、重连、接管后屏幕和窗口恢复正常。
+当前一加与 iPad 的自动路由已经在本地 feature branch `codex/controller-screen-routing-phase-0-5` 完成并通过现有检查；该分支尚未合并、未 push。Neo、ThinkPad 和 Legion 的最终路由收口后，再把本阶段整体合入主线。
 
 ---
 
-## Phase 1：macOS Controller，先解决键盘 LOCAL / REMOTE
+## Phase 2：macOS 本机 / 远端键盘模式
 
-第一项新增能力只做键盘，不做触控板。
+目标设备首先是 MacBook Neo。
 
-目标设备：MacBook Neo 等 macOS 控制端。
+第一步只解决键盘，不做触控板。核心行为：
 
-### 第一项技术验证
+- **本机模式**：快捷键继续作用于 MacBook Neo 本机；
+- **远端模式**：选定快捷键只作用于远程 Mac mini；
+- 模式切换不能让同一次按键同时作用于两端；
+- UU远程 不在前台、远程会话结束、Controller 退出或异常时，恢复安全的本机输入状态。
+
+### 第一项技术验证：Alt+Tab
 
 先只验证一件事：
 
-> UU远程 前台时，macOS Controller 能否在 REMOTE 模式阻止本机消费 `Alt+Tab`，并让同一组合稳定到达远程 Mac，由远程 Mac 上现有的 AltTab 处理。
+> UU远程 前台时，Controller 能否在远端模式阻止 Neo 本机消费 `Alt+Tab`，并让同一组合稳定到达 Mac mini，由 Mac mini 上现有的 AltTab 处理。
 
-需要分别确认：
+通过后做最小可用版：
 
-- LOCAL 模式：`Alt+Tab` 继续切换 MacBook 本机 App；
-- REMOTE 模式：MacBook 本机不切 App，远程 Mac mini 收到完整按键并执行远端 AltTab；
-- 切换过程中不会出现一次同时作用于本机和远端；
-- Controller 退出或异常时立即恢复系统原有输入行为。
+- 一个固定的本机 / 远端切换快捷键；
+- 轻量、明确的当前模式提示；
+- 可以快速回到本机模式；
+- 不修改 UU远程 本体；
+- 不先做复杂设置界面。
 
-### 第一版 Controller
-
-技术验证通过后，再做最小可用版：
-
-- 一个固定的 LOCAL / REMOTE 切换快捷键；
-- 当前模式有轻量、明确的状态提示；
-- 可以快速临时退出 REMOTE；
-- UU远程 不在前台或远程会话结束时，优先恢复安全的本机输入状态；
-- 不改 UU远程 设置，不依赖修改 UU 本体；
-- 不加入复杂配置界面。
-
-第一版先覆盖 `Alt+Tab`。其他键盘组合只有在真实使用中证明需要时再增加。
+其他快捷键等真实使用证明需要后再加。
 
 ---
 
-## Phase 2：Windows Controller，复用同一行为模型
+## Phase 3：Windows 本机 / 远端键盘模式
 
-macOS 键盘模式稳定后，再做 ThinkPad / Windows 控制端。
+macOS 键盘模式稳定后，把同一行为带到 ThinkPad / Windows 控制端。
 
 目标保持一致：
 
-- LOCAL：系统快捷键作用于 Windows 本机；
-- REMOTE：选定快捷键不再触发 Windows 本机动作，而是经 UU远程作用于远程 Mac。
+- **本机模式**：系统快捷键作用于 Windows 本机；
+- **远端模式**：选定快捷键不再触发 Windows 本机动作，而是经 UU远程作用于 Mac mini；
+- 会话结束、Controller 退出或异常时恢复本机输入。
 
-优先复用 Phase 1 已经确定的：
+复用 Phase 2 已经确定的状态模型、切换语义和恢复规则；Windows 底层按自己的稳定机制实现，不为了代码统一引入重量级跨平台框架。
 
-- LOCAL / REMOTE 状态模型；
-- 切换快捷键的语义；
-- 状态提示；
-- 会话结束后的恢复规则；
-- 异常退出时的输入恢复规则。
-
-Windows 可以使用自己的底层键盘机制实现，不为了“跨平台统一代码”强行引入重量级框架。
-
-在真实链路确认前，不假设 Windows 的 `Alt`、`Win`、`Ctrl` 与远端 macOS 修饰键如何映射；以 ThinkPad → UU远程 → Mac mini 实测决定。
+在真实链路验证前，不预设 Windows 的 `Alt`、`Win`、`Ctrl` 到远端 macOS 修饰键的最终映射。
 
 ---
 
-## Phase 3：macOS 触控板远端手势
+## Phase 4：macOS 触控板远端手势
 
-键盘 LOCAL / REMOTE 已经稳定以后，再开始最难的一层。
+键盘本机 / 远端模式稳定后，再处理 MacBook Neo 触控板。
 
-第一批目标手势：
+第一批目标：
 
 - 三指左右：切换远程 Mac 的 Space；
 - 三指上：远程 Mission Control；
-- 三指下：远程 App Exposé；
-- 是否加入四指左右切 App，等前三项实际体验后决定。
+- 三指下：远程 App Exposé。
 
-核心验收标准不是“能识别手势”，而是：
+本机模式保持 macOS 原有手势；远端模式下，同一手势只作用于远程 Mac，不能同时触发 Neo 本机的 Space 或 Mission Control。
 
-### LOCAL
-
-macOS 本机手势保持原样。
-
-### REMOTE
-
-同一手势只作用于远程 Mac，本机不能同时切 Space 或打开 Mission Control。
-
-先做独立技术验证，再决定正式实现。优先使用稳定公开接口；如果公开接口只能观察、不能可靠阻止本机动作，再单独评估更底层方案，不把实验性实现直接并入日常版本。
+先做独立技术验证。优先使用稳定接口；如果只能观察手势、不能可靠阻止本机动作，再单独评估更底层方案，不把实验实现直接并入日常版本。
 
 ---
 
-## Phase 4：Windows 触控板与后续输入增强
+## Phase 5：Windows 触控板与后续输入增强
 
-只有 macOS 触控板方案证明产品价值后，再评估 Windows Precision Touchpad。
+只有 macOS 触控板方案已经证明有实际价值后，再评估 Windows Precision Touchpad。
 
-这一阶段不承诺与 macOS 完全同等能力。先调查 Windows 能否稳定：
+需要确认 Windows 能否稳定：
 
 - 区分三/四指系统手势；
-- 在 REMOTE 模式阻止本机动作；
-- 将动作转换成远程 Mac 的系统操作；
-- 在 Controller 异常退出后可靠恢复。
+- 在远端模式阻止本机动作；
+- 将动作转换成远程 Mac 系统操作；
+- Controller 异常退出后可靠恢复。
 
-无法稳定满足这些条件时，Windows 继续保留键盘 Controller，不为了功能对称引入脆弱实现。
+若这些条件不能稳定满足，Windows 保留键盘 Controller，不为了平台功能对称引入脆弱实现。
 
 ---
 
@@ -206,21 +138,20 @@ UUFlow 是 Snug 的功能扩展，不以大规模重写上游为目标。
 
 - 尽量保留 Snug 的核心目录结构和成熟实现；
 - 被控端已有功能优先直接复用；
-- Controller 放在清晰独立的目录/目标中，减少与上游冲突；
-- 上游的重要修复继续评估并同步；
-- 修改 Snug 原有行为时，需要有 UUFlow 的明确用户价值；
-- 保留原项目版权与 MIT 许可要求，并在文档中明确上游来源。
+- 新增能力优先补真实缺口，不重复实现已有模块；
+- Controller 放在独立目录 / target，减少与上游同步冲突；
+- 上游重要修复继续评估并同步；
+- 修改 Snug 原有行为时必须有明确的 UUFlow 用户价值；
+- 保留原项目版权与 MIT 许可要求。
 
 ---
 
 ## 当前实施顺序
 
-1. **Phase 0 已完成安装，但实测发现会干扰 Legion 远控；当前版本先停止常驻使用。**
-2. **Phase 0.5：先实现“按控制端设备选择屏幕或完全旁路”，并确保 Legion 连接时 UUFlow 不介入。**
-3. **回到 Mac mini 旁完成 Legion / 手机 / iPad / Neo 四类真实设备验收，确认 Snug 底座值得长期保留。**
-4. **macOS Controller：打通 LOCAL / REMOTE + AltTab。**
-5. **Windows Controller：把同一键盘模式带到 ThinkPad。**
-6. **macOS 触控板：三指 Space / Mission Control / App Exposé。**
-7. **最后再评估 Windows 触控板和其他输入增强。**
+1. **完成 Phase 1**：一加和 iPad 已完成；补 Neo、ThinkPad 专属屏路由，并确认 Legion 旁路后收口。
+2. **Phase 2**：MacBook Neo 上实现本机 / 远端键盘模式，第一项只打通 Alt+Tab。
+3. **Phase 3**：把同一键盘模式带到 ThinkPad / Windows。
+4. **Phase 4**：MacBook Neo 三指 Space / Mission Control / App Exposé。
+5. **Phase 5**：最后评估 Windows 触控板与其他输入增强。
 
-Phase 0.5 没有通过前，不开始 Controller 和触控板开发。
+Phase 1 没有收口前，不开始 Controller 和触控板开发。

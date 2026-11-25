@@ -110,14 +110,17 @@ struct ScreenPlanTests {
     }
 }
 
-@Suite("一加 12、iPad Air M1 与 ThinkPad E16 精确路由")
+@Suite("一加、iPad、ThinkPad 与 MacBook Neo 精确路由")
 struct DeviceRoutingTests {
     private let onePlusName = "一加 12 全网通版"
     private let ipadName = "iPad Air 5"
     private let thinkPadName = "THINKPAD-E16"
+    private let neoName = "MacBook-Neo"
+    private let legionName = "LEGION-Y9000P"
     private let onePlusID = ScreenID("oneplus-landscape")
     private let ipadID = ScreenID("ipad-air-m1")
     private let thinkPadID = ScreenID("thinkpad-e16")
+    private let neoID = ScreenID("macbook-neo")
 
     private func config() -> AppConfig {
         var c = AppConfig()
@@ -155,10 +158,23 @@ struct DeviceRoutingTests {
                 name: "ThinkPad E16",
                 serials: [3]
             ),
+            ScreenConfig(
+                id: neoID,
+                orientation: .landscape,
+                device: DeviceChoice(
+                    model: nil,
+                    screen: DeviceScreen(width: 881, height: 1408),
+                    kind: .computer
+                ),
+                name: "MacBook Neo",
+                serials: [4]
+            ),
         ]
         c.bindController(onePlusName, to: onePlusID)
         c.bindController(ipadName, to: ipadID)
         c.bindController(thinkPadName, to: thinkPadID)
+        c.bindController(neoName, to: neoID)
+        c.bindController(legionName, to: nil)
         return c
     }
 
@@ -171,26 +187,30 @@ struct DeviceRoutingTests {
         ).map(\.id)
     }
 
-    @Test("三个真实名称各只选中自己的屏")
+    @Test("四个真实名称各只选中自己的屏")
     func exactNames() {
         #expect(selected([onePlusName]) == [onePlusID])
         #expect(selected([ipadName]) == [ipadID])
         #expect(selected([thinkPadName]) == [thinkPadID])
+        #expect(selected([neoName]) == [neoID])
     }
 
-    @Test("一加与 iPad 双向接管时，结果只跟当前控制端走")
+    @Test("已绑定设备双向接管时，结果只跟当前控制端走")
     func takeoverBothWays() {
         #expect([selected([onePlusName]), selected([ipadName]), selected([onePlusName])] == [[onePlusID], [ipadID], [onePlusID]])
         #expect([selected([ipadName]), selected([onePlusName]), selected([ipadName])] == [[ipadID], [onePlusID], [ipadID]])
         #expect([selected([thinkPadName]), selected([onePlusName])] == [[thinkPadID], [onePlusID]])
         #expect([selected([onePlusName]), selected([thinkPadName])] == [[onePlusID], [thinkPadID]])
+        #expect([selected([neoName]), selected([ipadName])] == [[neoID], [ipadID]])
+        #expect([selected([thinkPadName]), selected([neoName])] == [[thinkPadID], [neoID]])
     }
 
     @Test("未识别、未绑定、多个名称及其他设备都旁路")
     func defaultsToBypass() {
         #expect(selected([]).isEmpty)
         #expect(selected(["未绑定设备"]).isEmpty)
-        #expect(selected(["LEGION-Y9000P"]).isEmpty)
+        #expect(selected([legionName]).isEmpty)
+        #expect(config().binding(for: legionName)?.screen == nil)
         #expect(selected([onePlusName, ipadName]).isEmpty)
     }
 
@@ -205,9 +225,16 @@ struct DeviceRoutingTests {
         c.screens[1].enabled = true
         c.screens[2].enabled = false
         #expect(selected([thinkPadName], config: c).isEmpty)
+        c.screens[2].enabled = true
+        c.screens[3].enabled = false
+        #expect(selected([neoName], config: c).isEmpty)
+        c.screens[3].enabled = true
+        c.removeScreen(neoID)
+        #expect(selected([neoName], config: c).isEmpty)
         #expect(selected([onePlusName], remote: false, config: c).isEmpty)
         #expect(selected([ipadName], remote: false, config: c).isEmpty)
         #expect(selected([thinkPadName], remote: false, config: c).isEmpty)
+        #expect(selected([neoName], remote: false, config: c).isEmpty)
     }
 
     @Test("手机屏与 iPad 屏都保持触屏行为")
@@ -231,6 +258,21 @@ struct DeviceRoutingTests {
         #expect(c.screens[2].device.screen == DeviceScreen(width: 720, height: 1280))
         #expect(wish.fit.baseWidth == 1280)
         #expect(wish.fit.size(width: wish.fit.baseWidth) == CGSize(width: 1280, height: 720))
+    }
+
+    @Test("Neo 只创建 1408×881 电脑屏，不带出其他设备屏")
+    func neoComputerBehavior() throws {
+        let c = config()
+        let wishes = ScreenPlan.wishes(config: c, remote: true, controllers: [neoName], trusted: true)
+        #expect(wishes.count == 1)
+        let wish = try #require(wishes.first)
+        #expect(wish.id == neoID)
+        #expect(wish.behavior == .computer)
+        #expect(c.screens[3].orientation == .landscape)
+        #expect(c.screens[3].device.screen == DeviceScreen(width: 881, height: 1408))
+        #expect(c.screens[3].device.screen.notch == nil)
+        #expect(wish.fit.baseWidth == 1408)
+        #expect(wish.fit.size(width: wish.fit.baseWidth) == CGSize(width: 1408, height: 881))
     }
 }
 

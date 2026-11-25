@@ -190,11 +190,13 @@ struct ConfigModelTests {
         #expect(!c.controllerBindings.contains { $0.screen == tablet.id })
     }
 
-    @Test("一加、iPad 与 ThinkPad 的真实名称映射可持久化；删屏后对应映射失效")
+    @Test("一加、iPad、ThinkPad 与 Neo 的真实名称映射可持久化；删屏后对应映射失效")
     func deviceBindingsRoundTripAndRemoval() throws {
         let onePlusName = "一加 12 全网通版"
         let ipadName = "iPad Air 5"
         let thinkPadName = "THINKPAD-E16"
+        let neoName = "MacBook-Neo"
+        let legionName = "LEGION-Y9000P"
         var c = AppConfig()
         c.screens[0] = ScreenConfig(
             id: .phone,
@@ -219,20 +221,33 @@ struct ConfigModelTests {
             name: "ThinkPad E16"
         )
         let thinkPad = try #require(computer)
+        let neoComputer = c.addScreen(
+            orientation: .landscape,
+            device: DeviceChoice(model: nil, screen: DeviceScreen(width: 881, height: 1408), kind: .computer),
+            name: "MacBook Neo"
+        )
+        let neo = try #require(neoComputer)
         c.bindController(onePlusName, to: .phone)
         c.bindController(ipadName, to: ipad.id)
         c.bindController(thinkPadName, to: thinkPad.id)
+        c.bindController(neoName, to: neo.id)
+        c.bindController(legionName, to: nil)
 
         let loaded = try JSONDecoder().decode(AppConfig.self, from: JSONEncoder().encode(c))
         #expect(loaded.binding(for: onePlusName)?.screen == .phone)
         #expect(loaded.binding(for: ipadName)?.screen == ipad.id)
         #expect(loaded.binding(for: thinkPadName)?.screen == thinkPad.id)
+        #expect(loaded.binding(for: neoName)?.screen == neo.id)
+        #expect(loaded.binding(for: legionName)?.screen == nil)
         #expect(loaded.screens.first { $0.id == thinkPad.id }?.device.screen == DeviceScreen(width: 720, height: 1280))
+        #expect(loaded.screens.first { $0.id == neo.id }?.device.screen == DeviceScreen(width: 881, height: 1408))
 
-        c.removeScreen(thinkPad.id)
-        #expect(c.binding(for: thinkPadName)?.screen == nil)
+        c.removeScreen(neo.id)
+        #expect(c.binding(for: neoName)?.screen == nil)
         #expect(c.binding(for: onePlusName)?.screen == .phone)
         #expect(c.binding(for: ipadName)?.screen == ipad.id)
+        #expect(c.binding(for: thinkPadName)?.screen == thinkPad.id)
+        #expect(c.binding(for: legionName)?.screen == nil)
     }
 
     @Test("配置中的空名称、重复名称和悬空屏号会安全收敛；悬空绑定变成旁路")

@@ -33,9 +33,9 @@ UUFlow 复用现有“本机被控中”控制端读取能力，根据 UU 实际
 
 - **一加 12**：专属横屏已配置并完成自动路由。UU 实际名称为“一加 12 全网通版”。
 - **iPad Air M1**：按 iPad Air 第 5 代配置横屏，1640×2360、points 820；自动路由已完成。UU 实际名称为“iPad Air 5”。
-- **MacBook Neo**：电脑横屏已经准备，自定义逻辑分辨率 1408×881、无刘海。自动路由明天处理，本轮保持未动。
+- **MacBook Neo**：专属电脑横屏最终冻结为自定义逻辑分辨率 **1408×881**、无刘海，UU 实际名称为“MacBook-Neo”，自动路由已完成。实机连接时只创建这一块虚拟屏；UU 能识别并推流该屏，画面基本铺满，未见明显黑边、拉伸或重要内容裁切。
 - **ThinkPad E16**：专属电脑横屏最终冻结为自定义逻辑分辨率 **1280×720**，UU 实际名称为“THINKPAD-E16”，自动路由已完成。1280×800 虽与面板 2560×1600 保持 2 倍关系，但在 ThinkPad 的 UU 实际画面区域中产生明显左右黑边，因此被实机结果淘汰。1280×720 改用 16:9 后，左右黑边基本消失，画面未见拉伸或裁切，字号仍可正常使用。
-- **Legion Y9000P**：保持旁路，不创建 UUFlow 虚拟屏，不改变 Mac mini 显示拓扑。
+- **Legion Y9000P**：UU 实际名称为“LEGION-Y9000P”，已显式绑定为旁路，不创建 UUFlow 虚拟屏，不改变 Mac mini 显示拓扑。
 
 ### Phase 1 完成标准
 
@@ -50,7 +50,7 @@ UUFlow 复用现有“本机被控中”控制端读取能力，根据 UU 实际
 9. 手机、平板继续使用触控增强；电脑屏保持普通显示器行为；
 10. `mainScreen` 默认保持为空，不依赖常驻虚拟主屏实现路由。
 
-当前一加、iPad 与 ThinkPad 的自动路由已经在本地 feature branch `codex/controller-screen-routing-phase-0-5` 完成；MacBook Neo 明天处理，Legion 继续保持旁路目标。该分支尚未合并、未 push；Phase 2 的 macOS 本机 / 远端键盘模式尚未开始。
+一加、iPad、MacBook Neo 与 ThinkPad 的专属屏和自动路由已经在本地 feature branch `codex/controller-screen-routing-phase-0-5` 完成，Legion 已显式旁路；Phase 1 已收口。该分支尚未合并、未 push；Phase 2 的 macOS 本机 / 远端键盘模式尚未开始。
 
 ---
 
@@ -148,8 +148,8 @@ UUFlow 是 Snug 的功能扩展，不以大规模重写上游为目标。
 
 ## 当前实施顺序
 
-1. **完成 Phase 1**：一加、iPad 和 ThinkPad 已完成；MacBook Neo 明天处理，Legion 继续保持旁路目标。
-2. **Phase 2**：MacBook Neo 上实现本机 / 远端键盘模式，第一项只打通 Alt+Tab。
+1. **Phase 1 已完成**：一加、iPad、MacBook Neo 与 ThinkPad 按真实控制端名称自动路由到各自专属屏；Legion 显式旁路。
+2. **下一阶段是 Phase 2**：MacBook Neo 上实现 macOS 本机 / 远端键盘模式，第一项只验证 Alt+Tab。
 3. **Phase 3**：把同一键盘模式带到 ThinkPad / Windows。
 4. **Phase 4**：MacBook Neo 三指 Space / Mission Control / App Exposé。
 5. **Phase 5**：最后评估 Windows 触控板与其他输入增强。

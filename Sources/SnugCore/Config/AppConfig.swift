@@ -68,18 +68,20 @@ public struct AppConfig: Codable, Equatable, Sendable {
         if mainScreen == id { mainScreen = nil }
         for i in controllerBindings.indices where controllerBindings[i].screen == id {
             controllerBindings[i].screen = nil
+            controllerBindings[i].mainDuringSession = false
         }
     }
 
-    /// 同名规则只有一条；空名称不收。nil 是显式旁路，不是删除规则。
-    public mutating func bindController(_ name: String, to screen: ScreenID?) {
+    /// 同名规则只有一条；空名称不收。nil 是显式旁路，不是删除规则。临时主屏只对有目标屏的规则有效。
+    public mutating func bindController(_ name: String, to screen: ScreenID?, mainDuringSession: Bool = false) {
         let name = name.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !name.isEmpty else { return }
         let screen = screen.flatMap { id in screens.contains { $0.id == id } ? id : nil }
         if let i = controllerBindings.firstIndex(where: { $0.name == name }) {
             controllerBindings[i].screen = screen
+            controllerBindings[i].mainDuringSession = screen != nil && mainDuringSession
         } else {
-            controllerBindings.append(ControllerBinding(name: name, screen: screen))
+            controllerBindings.append(ControllerBinding(name: name, screen: screen, mainDuringSession: mainDuringSession))
         }
     }
 
@@ -143,7 +145,7 @@ public struct AppConfig: Codable, Equatable, Sendable {
             }
             let screen = binding.screen.flatMap { id in screens.contains { $0.id == id } ? id : nil }
             if binding.screen != nil, screen == nil { Log.warn("控制端「\(name)」绑定的屏已不存在，改为旁路") }
-            return ControllerBinding(name: name, screen: screen)
+            return ControllerBinding(name: name, screen: screen, mainDuringSession: screen != nil && binding.mainDuringSession)
         }
         mainScreen = (try? c.decodeIfPresent(ScreenID.self, forKey: .mainScreen)).flatMap { id in screens.contains { $0.id == id } ? id : nil }
         nextSerialBlock = ((try? c.decodeIfPresent(Int.self, forKey: .nextSerialBlock)) ?? 0).clamped(to: 0...Self.maxSerialBlock)

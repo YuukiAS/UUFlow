@@ -20,7 +20,7 @@ struct ScreenPlanTests {
         c.bindController(legion, to: nil)
         c.bindController(phone, to: .phone)
         c.bindController(tablet, to: c.screens[1].id)
-        c.bindController(neo, to: c.screens[2].id)
+        c.bindController(neo, to: c.screens[2].id, mainDuringSession: true)
         return c
     }
 
@@ -42,6 +42,9 @@ struct ScreenPlanTests {
         #expect(phoneWishes.map(\.id) == [.phone])
         #expect(tabletWishes.map(\.id) == [c.screens[1].id])
         #expect(neoWishes.map(\.id) == [c.screens[2].id])
+        #expect(phoneWishes.map(\.main) == [false])
+        #expect(tabletWishes.map(\.main) == [false])
+        #expect(neoWishes.map(\.main) == [true])
         #expect(phoneWishes[0].spec == ScreenPlan.spec(of: c.screens[0]))
         #expect(tabletWishes[0].fit == ScreenPlan.fit(of: c.screens[1]))
     }
@@ -90,11 +93,12 @@ struct ScreenPlanTests {
         #expect(tabletWishes[0].spec.maxPixels == ScreenFit.landscapePixels)
     }
 
-    @Test("真实远程停用设为主屏，不能绕过旁路或额外搬窗口；显式预览仍保留旧行为")
+    @Test("真实远程只采用控制端规则的临时主屏；旧 mainScreen 不能绕过旁路，显式预览仍保留旧行为")
     func main() {
         var c = config()
         c.mainScreen = c.screens[1].id
         #expect(ScreenPlan.wishes(config: c, remote: remote, controllers: [tablet], trusted: true).map(\.main) == [false])
+        #expect(ScreenPlan.wishes(config: c, remote: remote, controllers: [neo], trusted: true).map(\.main) == [true])
         #expect(ScreenPlan.wishes(config: c, remote: remote, controllers: [legion], trusted: true).isEmpty)
         #expect(ScreenPlan.wishes(config: c, remote: false, controllers: [], trusted: true).isEmpty)
         #expect(ScreenPlan.wishes(config: c, remote: false, controllers: [], trusted: true, preview: true).map(\.main) == [false, true, false])
@@ -173,7 +177,7 @@ struct DeviceRoutingTests {
         c.bindController(onePlusName, to: onePlusID)
         c.bindController(ipadName, to: ipadID)
         c.bindController(thinkPadName, to: thinkPadID)
-        c.bindController(neoName, to: neoID)
+        c.bindController(neoName, to: neoID, mainDuringSession: true)
         c.bindController(legionName, to: nil)
         return c
     }
@@ -195,6 +199,19 @@ struct DeviceRoutingTests {
         #expect(selected([neoName]) == [neoID])
     }
 
+    @Test("只有 MacBook Neo 路由要求会话临时主屏；一加、iPad、ThinkPad 都保持普通副屏")
+    func onlyNeoClaimsMain() {
+        let c = config()
+        func main(_ name: String) -> [Bool] {
+            ScreenPlan.wishes(config: c, remote: true, controllers: [name], trusted: true).map(\.main)
+        }
+        #expect(main(onePlusName) == [false])
+        #expect(main(ipadName) == [false])
+        #expect(main(thinkPadName) == [false])
+        #expect(main(neoName) == [true])
+        #expect(c.mainScreen == nil)
+    }
+
     @Test("已绑定设备双向接管时，结果只跟当前控制端走")
     func takeoverBothWays() {
         #expect([selected([onePlusName]), selected([ipadName]), selected([onePlusName])] == [[onePlusID], [ipadID], [onePlusID]])
@@ -203,6 +220,12 @@ struct DeviceRoutingTests {
         #expect([selected([onePlusName]), selected([thinkPadName])] == [[onePlusID], [thinkPadID]])
         #expect([selected([neoName]), selected([ipadName])] == [[neoID], [ipadID]])
         #expect([selected([thinkPadName]), selected([neoName])] == [[thinkPadID], [neoID]])
+        let c = config()
+        let neo = ScreenPlan.wishes(config: c, remote: true, controllers: [neoName], trusted: true)
+        let onePlus = ScreenPlan.wishes(config: c, remote: true, controllers: [onePlusName], trusted: true)
+        let ipad = ScreenPlan.wishes(config: c, remote: true, controllers: [ipadName], trusted: true)
+        let thinkPad = ScreenPlan.wishes(config: c, remote: true, controllers: [thinkPadName], trusted: true)
+        #expect([neo.map(\.main), onePlus.map(\.main), ipad.map(\.main), thinkPad.map(\.main)] == [[true], [false], [false], [false]])
     }
 
     @Test("未识别、未绑定、多个名称及其他设备都旁路")

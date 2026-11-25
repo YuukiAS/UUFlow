@@ -100,6 +100,35 @@ struct ScreenSetModeTests {
         #expect(rig.journal.all.count == 2)
     }
 
+    @Test("Neo 会话临时主屏退出：先恢复 Dell 主屏再撤 Neo；拓扑临时模式不得覆盖 Dell 原模式")
+    func neoSessionMainRestoresDellBeforeRetiring() async throws {
+        let rig = try Rig()
+        rig.displays.others = [1: redmi60]
+        var neo = rig.desk.wish
+        neo.spec.name = "MacBook Neo"
+        neo.behavior = .computer
+        neo.main = true
+        rig.desk.setRemote(true)
+        rig.set.setWishes([neo])
+        await rig.set.idle()
+        #expect(rig.arrangement.main == 101)
+
+        rig.timeline.advance(10)
+        rig.journal.clear()
+        rig.displays.onRetire = { [unowned displays = rig.displays] in displays.others[1] = redmi30 }
+        rig.set.setWishes([])
+        rig.desk.setRemote(false)
+        await rig.set.idle()
+
+        let restored = try #require(rig.journal.all.firstIndex { $0.hasPrefix("arrange") })
+        let retired = try #require(rig.journal.index(of: "retire 101"))
+        #expect(restored < retired)
+        #expect(rig.arrangement.main == 1)
+        #expect(rig.journal.all.contains("mode 1 \(redmi60) 永久"))
+        #expect(!rig.journal.all.contains("mode 1 \(redmi30) 永久"))
+        #expect(rig.displays.others[1] == redmi60)
+    }
+
     @Test("远程结束时原物理屏暂时不在线：不拿临时屏冒充基线；原屏回来后再恢复并永久保持原模式")
     func waitsForOriginalDisplayBeforePersisting() async throws {
         let rig = try Rig()

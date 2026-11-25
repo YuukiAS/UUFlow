@@ -1,7 +1,7 @@
 // 策略：配置 + 会话 → 此刻要哪些屏、每块的比例和行为。纯函数，规则只写在这里，换规则不动任何模块（docs/development.md「代码结构」）。
 // - 只有恰好认出一个控制端、且这个名称显式绑定到一块开着的屏时才建屏；未识别、未配置、显式旁路、多名称都旁路
 // - 换手时按这一拍读到的控制端重新选择，只保留新控制端绑定的那块
-// - 设为主屏不能绕过旁路：真实远程中停用，避免连接后改主屏再搬一遍窗口；只在显式预览模式保留旧行为
+// - 临时主屏跟着命中的控制端规则走；旧 mainScreen 不能绕过旁路，只在显式预览模式保留
 // - --preview-screens 是离线自测，仍建出所有开着的屏，不依赖控制端规则
 // - 类别到行为的映射只在这里：手机、平板是触屏（屏上有面板、翻译手势、放大字号），电脑不是
 import Foundation
@@ -13,17 +13,21 @@ public enum ScreenPlan {
         guard trusted else { return [] }
         let shown = config.screens.filter(\.enabled).prefix(ScreenConfig.limit)
         let selected: ArraySlice<ScreenConfig>
+        let sessionMain: ScreenID?
         if preview {
             selected = shown
+            sessionMain = nil
         } else {
             guard remote, controllers.count == 1,
-                  let screenID = config.binding(for: controllers[0])?.screen,
+                  let binding = config.binding(for: controllers[0]),
+                  let screenID = binding.screen,
                   let index = shown.firstIndex(where: { $0.id == screenID }) else { return [] }
             selected = shown[index...index]
+            sessionMain = binding.mainDuringSession ? screenID : nil
         }
         return selected.map { screen in
             ScreenWish(id: screen.id, spec: spec(of: screen), fit: fit(of: screen), behavior: behavior(screen.device.kind),
-                       main: preview && config.mainScreen == screen.id)
+                       main: preview ? config.mainScreen == screen.id : sessionMain == screen.id)
         }
     }
 

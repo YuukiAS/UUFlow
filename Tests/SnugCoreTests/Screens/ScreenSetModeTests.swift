@@ -67,24 +67,24 @@ struct ScreenSetModeTests {
         #expect(!rig.journal.all.contains { $0.hasPrefix("mode") })
     }
 
-    @Test("远程中撤屏（手机上退出手机屏）：撤屏前可能是远程用的临时模式，只对本次登录设回；远程结束、屏都醒着时，把别的屏此刻的模式写进永久配置")
-    func retireDuringRemotePersistsAfterwards() async throws {
+    @Test("远程中撤屏：记住撤屏前的物理屏模式；远程结束时即使当前又漂到临时模式，也只把原模式写进永久配置")
+    func retireDuringRemotePersistsOriginalMode() async throws {
         let rig = try Rig()
-        rig.displays.others = [1: redmi30, 3: hp]
+        rig.displays.others = [1: redmi60, 3: hp]
         rig.desk.setRemote(true)
         await rig.ready()
-        rig.displays.onRetire = { [unowned displays = rig.displays] in displays.others[1] = redmi60 }
+        rig.displays.onRetire = { [unowned displays = rig.displays] in displays.others[1] = redmi30 }
         rig.desk.dismissScreen()
         await rig.desk.idle()
-        #expect(rig.journal.all.contains("mode 1 \(redmi30)"))
+        #expect(rig.journal.all.contains("mode 1 \(redmi60)"))
         #expect(!rig.journal.all.contains { $0.hasSuffix("永久") })
         rig.desk.settleDisplays()
         await rig.desk.idle()
         #expect(!rig.journal.all.contains { $0.hasSuffix("永久") })
 
-        // 远程结束，UU 把主屏还原成 60Hz（只对本次登录）；屏还睡着时等着
+        // 远程结束前，系统又临时漂到 30Hz。永久基线仍应是撤屏前记下的 60Hz。
         rig.journal.clear()
-        rig.displays.others[1] = redmi60
+        rig.displays.others[1] = redmi30
         rig.displays.asleep = [1, 3]
         rig.desk.setRemote(false)
         rig.desk.settleDisplays()
@@ -94,15 +94,48 @@ struct ScreenSetModeTests {
         rig.desk.settleDisplays()
         await rig.desk.idle()
         #expect(rig.journal.all == ["mode 1 \(redmi60) 永久", "mode 3 \(hp) 永久"])
+        #expect(rig.displays.others == [1: redmi60, 3: hp])
         rig.desk.settleDisplays()
         await rig.desk.idle()
         #expect(rig.journal.all.count == 2)
     }
 
-    @Test("设为主屏的那块常驻：远程中撤过别的屏，远程结束后常驻屏还在，照样把别的屏此刻的模式写进永久配置")
+    @Test("远程结束时原物理屏暂时不在线：不拿临时屏冒充基线；原屏回来后再恢复并永久保持原模式")
+    func waitsForOriginalDisplayBeforePersisting() async throws {
+        let rig = try Rig()
+        rig.displays.others = [1: redmi60]
+        rig.desk.setRemote(true)
+        await rig.ready()
+        rig.desk.dismissScreen()
+        await rig.desk.idle()
+
+        // 同一轮远程又建撤一次时只剩临时屏；不能把它补进第一次记下的基线。
+        rig.displays.others = [31: hp]
+        rig.desk.setWanted(false)
+        rig.desk.setWanted(true)
+        await rig.desk.idle()
+        rig.timeline.advance(10)
+        rig.desk.setWanted(false)
+        await rig.desk.idle()
+
+        rig.journal.clear()
+        rig.desk.setRemote(false)
+        rig.desk.settleDisplays()
+        await rig.desk.idle()
+        #expect(rig.journal.all.isEmpty)
+        #expect(rig.displays.others == [31: hp])
+
+        rig.displays.others[1] = redmi30
+        rig.desk.settleDisplays()
+        await rig.desk.idle()
+        #expect(rig.journal.all == ["mode 1 \(redmi60) 永久"])
+        #expect(rig.displays.others == [1: redmi60, 31: hp])
+    }
+
+    @Test("设为主屏的那块常驻：远程中撤过别的屏，远程结束后常驻屏还在，照样把撤屏前的原模式写进永久配置")
     func persistsWithResidentMain() async throws {
         let rig = try Rig()
-        rig.displays.others = [1: redmi30, 3: hp]
+        rig.displays.others = [1: redmi60, 3: hp]
         var main = rig.desk.wish
         main.main = true
         let spec = ScreenSpec(name: "Snug 第二块", productID: ScreenSpec.portraitProductID,
@@ -112,12 +145,12 @@ struct ScreenSetModeTests {
         rig.set.setWishes([main, other])
         await rig.set.idle()
         rig.timeline.advance(10)
-        rig.displays.onRetire = { [unowned displays = rig.displays] in displays.others[1] = redmi60 }
+        rig.displays.onRetire = { [unowned displays = rig.displays] in displays.others[1] = redmi30 }
         rig.set.dismissScreen(other.id)
         await rig.set.idle()
         rig.journal.clear()
-        // 远程结束，UU 把主屏还原成 60Hz；常驻的主屏还在
-        rig.displays.others[1] = redmi60
+        // 远程结束时物理屏仍处于临时 30Hz；常驻的 Snug 主屏还在
+        rig.displays.others[1] = redmi30
         rig.set.setWishes([])
         rig.set.setWishes([main])
         rig.desk.setRemote(false)

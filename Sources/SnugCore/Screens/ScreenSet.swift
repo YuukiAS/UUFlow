@@ -68,6 +68,9 @@ public final class ScreenSet {
     /// 同一块屏一轮远程只认最早一份，后续拓扑抖动不能覆盖用户原来的设置。
     /// nil 表示这轮远程还没撤过屏；空字典表示第一次撤屏时没有可安全记录的物理屏，后续抖动也不能改记临时屏。
     private var persistOwed: [DisplayID: OtherDisplay]?
+    /// 没有远程、也没有 Snug 屏时，物理屏最后一次稳定的样子。远控可能在 Snug 认出连接前先改物理屏模式；
+    /// 会话屏临时接管主屏时，以这份空闲基线恢复，不能把连入后的临时模式当作用户设置。
+    private var idleDisplays: [DisplayID: OtherDisplay] = [:]
 
     init(displays: any VirtualDisplays, windows: any WindowControl, arrangement: any DisplayArrangement, timeline: any Timeline,
          lane: SerialLane) {
@@ -156,9 +159,8 @@ public final class ScreenSet {
             persistOwed = Dictionary(uniqueKeysWithValues: before.others.map { ($0.id, $0) })
         }
         // 远程软件可能在 Snug 认出控制端之前，先把物理主屏拨到推流用的临时模式。会话屏要接管主屏时，
-        // macOS 会按新拓扑恢复物理屏自己的模式；这时不能再拿「加屏前」读到的远程临时模式盖回去。
-        // 窗口和排布仍照常善后，只有物理屏模式交给这次主屏拓扑切换的系统结果。
-        let restoreModes = !create.contains(where: \.main)
+        // 模式按连入前持续记录的空闲基线恢复；窗口位置仍按这次加屏前的真实位置善后。
+        let restoreModes = create.contains(where: \.main) ? useIdleModes(in: &before) : true
         let batch = Retiring(displays: gone, before: before, permanently: create.isEmpty && !remote,
                              restoreModes: restoreModes)
         let pending = retiring.map { $0.joined(batch) } ?? batch
@@ -248,6 +250,22 @@ public final class ScreenSet {
         return Surroundings(windows: await windows.snapshot(), others: others, snug: snug)
     }
 
+    /// 把加屏前读到的远控临时模式换成最后一次空闲基线；位置仍保留加屏前的真实值，供窗口善后。
+    /// 显示编号重排时只在名称唯一时接续；本轮新接入、没有基线的屏保持现状，不猜。
+    private func useIdleModes(in before: inout Surroundings) -> Bool {
+        guard !idleDisplays.isEmpty else { return false }
+        var matched = false
+        before.others = before.others.map { current in
+            let sameName = current.name.isEmpty ? [] : idleDisplays.values.filter { $0.name == current.name }
+            guard let idle = idleDisplays[current.id] ?? (sameName.count == 1 ? sameName[0] : nil) else { return current }
+            matched = true
+            var restored = current
+            restored.mode = idle.mode
+            return restored
+        }
+        return matched
+    }
+
     /// 屏幕组合换完（新屏上线、旧屏下线）后放回：先设回被拨动的屏（模式连分辨率一起变时会再挪窗口），
     /// 等系统挪完，再放回被挪动的窗口。这期间拔掉、新接上的屏不碰
     private func settle(_ before: Surroundings, after change: String, permanently: Bool,
@@ -289,6 +307,12 @@ public final class ScreenSet {
 
     /// 远程在不在进行（会话层的结论）。远程结束后，远程中撤屏留下的永久配置要重写（settleDisplays）
     func setRemote(_ on: Bool) -> Bool {
+        if !on, live.isEmpty {
+            let current = displays.otherDisplays()
+            if !current.isEmpty {
+                idleDisplays = Dictionary(current.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
+            }
+        }
         guard on != remote else { return false }
         remote = on
         if !on, persistOwed?.isEmpty == true { persistOwed = nil }

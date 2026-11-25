@@ -129,6 +129,26 @@ struct ScreenSetModeTests {
         #expect(rig.displays.others[1] == redmi60)
     }
 
+    @Test("Neo 会话临时主屏进入：远控连入前拨出的临时模式不得盖回 macOS 为新拓扑恢复的物理屏模式")
+    func neoSessionMainKeepsSystemRestoredDellMode() async throws {
+        let rig = try Rig()
+        // 远控已在 Snug 识别控制端之前把 Dell 临时拨到 30Hz；建 Neo 屏后，macOS 按新拓扑恢复了用户的 60Hz。
+        rig.displays.others = [1: redmi30]
+        rig.displays.onCreate = { [unowned displays = rig.displays] in displays.others[1] = redmi60 }
+        var neo = rig.desk.wish
+        neo.spec.name = "MacBook Neo"
+        neo.behavior = .computer
+        neo.main = true
+        rig.desk.setRemote(true)
+
+        rig.set.setWishes([neo])
+        await rig.set.idle()
+
+        #expect(rig.arrangement.main == 101)
+        #expect(rig.displays.others[1] == redmi60)
+        #expect(!rig.journal.all.contains("mode 1 \(redmi30)"))
+    }
+
     @Test("远程结束时原物理屏暂时不在线：不拿临时屏冒充基线；原屏回来后再恢复并永久保持原模式")
     func waitsForOriginalDisplayBeforePersisting() async throws {
         let rig = try Rig()

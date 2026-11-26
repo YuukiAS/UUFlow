@@ -1,6 +1,6 @@
 // 按内容切块（FastCDC）：在哪里切只看那一小段内容本身，不看它在文件里的位置。
 // 一个文件改了一处，只有那附近的一两块变了，前后的块原样不动；整段内容挪了位置，块也认得出来。
-// 发布时把 Snug.app 切成块打进包（UpdatePackage.make），更新时把装着的那份用同样的切法切一遍，本机已有的块不再下载。
+// 发布时把 UUFlow.app 切成块打进包（UpdatePackage.make），更新时把装着的那份用同样的切法切一遍，本机已有的块不再下载。
 // 块按 sha256 认，切法变了不会出错：只是跨过那一版的那次更新认不出本机的块，多下载一次整包。做法和参数照 SpeakMore 的 chunker.mjs
 import CryptoKit
 import Foundation

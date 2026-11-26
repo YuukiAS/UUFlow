@@ -160,7 +160,7 @@ Phase 1 已经修复物理屏模式错误永久写回的问题。
 - Neo `mainDuringSession` 正常，`AppConfig.mainScreen` 保持为空；
 - Dell 恢复逻辑保留原物理模式，不把远控期间的临时模式写成新基线；
 - 控制端表格收起或 UU 主界面暂时不可读时会恢复同一识别链，不会形成长期错误旁路；
-- `scripts/snug check` 完整通过：Swift 498 项、脚本 Python 15 项，零失败。
+- Phase 1 冻结时 `scripts/uuflow check` 的等价基线为 Swift 498 项、脚本 Python 15 项，零失败。
 
 Phase 1 的产品行为、真实设备验收、自动回归和文档已经一致。本阶段冻结；后续若修改这些能力，必须以本节不变量作为回归基线。
 
@@ -172,7 +172,7 @@ Phase 1 的产品行为、真实设备验收、自动回归和文档已经一致
 
 本阶段先完成产品身份和状态源统一，再进入 LOCAL / REMOTE Controller。目标是把现在分散在 UUFlow 与 Local Compute 的“当前控制端是谁”收敛成一个事实源。
 
-## 步骤 1：产品正式改名为 UUFlow
+## 步骤 1：产品正式改名为 UUFlow — DONE
 
 用户可见产品全面改名：
 
@@ -196,7 +196,9 @@ Phase 1 的产品行为、真实设备验收、自动回归和文档已经一致
 
 如果 App 文件名从 Snug.app 改为 UUFlow.app 会影响已有授权或安装替换流程，必须先设计一次性迁移和回滚，再切换；不能靠用户反复重新授权来证明改名成功。
 
-## 步骤 2：移除上游运行时自动更新
+2026-11-26 Mac mini 实机迁移完成：bundle ID、原配置、route、screen ID 与还原账均保留；旧 App 只在新 App 成功启动后移除。当前机器使用 ad-hoc 签名，改名后旧 TCC 记录表面开启但实际失效，删除旧条目并重新加入 `UUFlow.app` 一次后已恢复授权。开机启动保持单一 UUFlow 项。
+
+## 步骤 2：移除上游运行时自动更新 — DONE
 
 当前 fork 已经有独立功能，不能再把 zephyr4123/snug 的 release 当成 UUFlow 的可安装“新版本”。
 

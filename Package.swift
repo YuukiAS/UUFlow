@@ -4,9 +4,7 @@ import PackageDescription
 let package = Package(
     name: "Snug",
     platforms: [.macOS(.v14)],
-    products: [
-        .executable(name: "snug-release", targets: ["SnugRelease"]),
-    ],
+    products: [],
     dependencies: [
         // 权限引导：打开系统设置隐私页 + 拖拽授权悬浮面板（MIT，内置副本见 Vendor/PermissionFlow/VENDORED.md）
         .package(path: "Vendor/PermissionFlow"),
@@ -35,8 +33,6 @@ let package = Package(
                 .product(name: "PermissionFlow", package: "PermissionFlow"),
             ]
         ),
-        // 发版工具（只由 scripts/snug 调）：打更新包、写 update.json。和 App 共用 SnugCore 里的包格式
-        .executableTarget(name: "SnugRelease", dependencies: ["SnugCore"]),
         .testTarget(name: "SnugCoreTests", dependencies: ["SnugCore"]),
         .testTarget(name: "RemoteUUTests", dependencies: ["RemoteUU", "SnugCore"], path: "Tests/Remotes/UU", resources: [.copy("Fixtures")]),
         // 契约测试：每家远控一个驱动，跑同一组断言（接入新远控时的验收清单）

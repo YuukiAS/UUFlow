@@ -42,8 +42,6 @@ final class AppState {
     var legacyAppRunning = false
     /// 正在退出收尾
     var quitting = false
-    /// 应用内更新：查到了什么、进行到哪（Updater 写）
-    var update = UpdateState()
     /// 屏上浮着的截图界面：缩略图、裁剪或一句结果（Screenshots 写），和它在哪块屏上
     var screenshotOverlay: ScreenshotOverlay?
     var screenshotScreen: ScreenID?
@@ -58,15 +56,15 @@ final class AppState {
         PanelState(desk: desks.desks[id] ?? Desk.State(), quitting: desks.quitting, closing: desks.closing)
     }
 
-    /// Snug 的屏有没有人在用：远程中（含等重连），或预览自测
+    /// UUFlow 的屏有没有人在用：远程中（含等重连），或预览自测
     var screensInUse: Bool { connection != .idle || previewing }
 
-    /// 这块显示器是哪块 Snug 屏；不是 Snug 的屏（内建屏、外接显示器）返回 nil
+    /// 这块显示器是哪块 UUFlow 屏；不是 UUFlow 的屏（内建屏、外接显示器）返回 nil
     func screenID(on display: DisplayID) -> ScreenID? {
         desks.desks.first { $0.value.display == display }?.key
     }
 
-    /// 远控此刻在推的那块 Snug 屏，也就是用户此刻正在这块屏上
+    /// 远控此刻在推的那块 UUFlow 屏，也就是用户此刻正在这块屏上
     var watchedScreen: ScreenID? { streamedDisplay.flatMap { screenID(on: $0) } }
 
     /// 手机（控制端）此刻在看这块屏，资源库才为它刷。不知道远控在推哪块屏（UU 是推流日志没读到）时当作在看；
@@ -86,9 +84,9 @@ final class AppState {
 }
 
 enum LoginItemIssue: Equatable {
-    /// 用户在「登录项」里关过 Snug，要在那里允许
+    /// 用户在「登录项」里关过 UUFlow，要在那里允许
     case needsApproval
-    /// Snug 不在「应用程序」里
+    /// UUFlow 不在「应用程序」里
     case notInApplications
     case failed
 }
@@ -128,11 +126,6 @@ protocol AppIntents: AnyObject, Sendable {
     /// 不等重连窗口，立即结束本次远程（断开后的重连等待期里才有意义，issue #29）
     func endSessionNow()
     func quit()
-    func checkForUpdates()
-    func installUpdate()
-    func setUpdateSource(_ source: UpdateSource)
-    /// 自动更新走不通时，打开所选更新源的下载地址
-    func openDownloadPage()
     /// 指示条上的相机键（截图）
     func setScreenshot(_ on: Bool)
 }
@@ -175,7 +168,6 @@ protocol Navigation: AnyObject, Sendable {
     func openSettings(on display: DisplayID?)
     func openWelcome()
     func openAbout(on display: DisplayID?)
-    func openUpdate()
     /// 电脑屏的 App 资源库：在哪块屏的菜单栏点，就在哪块屏打开
     func openLibrary(on display: DisplayID?)
 }

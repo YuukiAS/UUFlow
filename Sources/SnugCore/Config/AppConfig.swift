@@ -18,9 +18,7 @@ public struct AppConfig: Codable, Equatable, Sendable {
     public var zoomSteps = 2
     /// 是否已看过首次启动的欢迎页
     public var welcomed = false
-    /// 从哪检查和下载更新。UU远程 的用户基本在国内，默认腾讯云
-    public var updateSource = UpdateSource.tencent
-    /// 上次运行的版本：和这次不一样说明刚换了版本，启动时弹「关于 Snug」
+    /// 上次运行的版本：用于配置迁移，不参与运行时更新
     public var lastVersion: Version?
 
     public static let zoomStepsRange = 0...4
@@ -129,7 +127,13 @@ public struct AppConfig: Codable, Equatable, Sendable {
                     Log.warn("配置里第 \(i + 1) 块屏解不开，丢掉这一项：\(error)")
                 }
             }
-            self.screens = screens
+            self.screens = screens.map { screen in
+                var screen = screen
+                if screen.name.hasPrefix("Snug ") {
+                    screen.name = "UUFlow " + screen.name.dropFirst("Snug ".count)
+                }
+                return screen
+            }
         } else {
             // 2.5 及以前：一块竖屏手机屏，开关和型号沿用；手改坏了的型号（缺字段、横着写、不是正数）用默认值
             let enabled = try c.decodeIfPresent(Bool.self, forKey: .phoneScreen) ?? true
@@ -153,8 +157,7 @@ public struct AppConfig: Codable, Equatable, Sendable {
         screenshot = try c.decodeIfPresent(Bool.self, forKey: .screenshot) ?? d.screenshot
         zoomSteps = try c.decodeIfPresent(Int.self, forKey: .zoomSteps).map { $0.clamped(to: Self.zoomStepsRange) } ?? d.zoomSteps
         welcomed = try c.decodeIfPresent(Bool.self, forKey: .welcomed) ?? d.welcomed
-        // 不认识的更新源（更新的版本加的、降级回来）用默认值
-        updateSource = (try? c.decodeIfPresent(UpdateSource.self, forKey: .updateSource)) ?? d.updateSource
+        // updateSource 是旧版运行时更新配置。保留 CodingKey 仅用于明确兼容旧文件；新版本忽略且不写回。
         lastVersion = try? c.decodeIfPresent(Version.self, forKey: .lastVersion)
     }
 }
@@ -183,7 +186,6 @@ extension AppConfig {
         try c.encode(screenshot, forKey: .screenshot)
         try c.encode(zoomSteps, forKey: .zoomSteps)
         try c.encode(welcomed, forKey: .welcomed)
-        try c.encode(updateSource, forKey: .updateSource)
         try c.encodeIfPresent(lastVersion, forKey: .lastVersion)
     }
 }

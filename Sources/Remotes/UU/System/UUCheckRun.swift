@@ -1,4 +1,4 @@
-// --check-remote uu [小时]：UU远程 兼容自检（scripts/snug remote-check uu 调）。收集事实交给 UUCheck 判定、打出报告，
+// --check-remote uu [小时]：UU远程 兼容自检（scripts/uuflow remote-check uu 调）。收集事实交给 UUCheck 判定、打出报告，
 // 并把原始材料写进 ~/Library/Logs/Snug-uu-check/（每次覆盖）：UU 的推流日志、上一次远程前后 UURemoteServer 的全部日志、
 // 这段时间的 Snug 日志、UU 的界面树、哪些程序链接了抓屏与编码框架。哪项不对直接看材料，不用再一步步复现。
 // 只读：不点 UU、不碰屏幕

@@ -1,153 +1,89 @@
 # 开发
 
-## 构建与发布
+## 日常入口
 
-构建、测试、打包与发布统一由 `scripts/snug` 完成（`scripts/snug help` 查看全部命令）。
+构建、测试、安装与本地打包统一使用 `scripts/uuflow`。
 
 | 命令 | 作用 |
 | :--- | :--- |
-| `scripts/snug check` | 先查远控适配层的边界（见「远控适配层」），再构建全部产物、运行全部测试（Swift Testing，以及 `scripts/` 中的 Python 单测），任一步骤失败即以非零状态退出 |
-| `scripts/snug app` | 生成 `build/Snug.app`（通用二进制）并签名 |
-| `scripts/snug install` | 生成 App、安装至「应用程序」并打开；正在运行的 Snug 会先正常退出，窗口先行归位 |
-| `scripts/snug dist` | 生成可分发的 `dist/<版本>/Snug-<版本>.dmg`：Developer ID 签名，App 与 dmg 分别公证并装订票据；再将公证后的 App 打成应用内更新用的 `Snug-<版本>.pack` |
-| `scripts/snug ship` | 发布：前置检查 → check → dist → 生成 `update.json` → 创建 GitHub Release 草稿并上传 → 公开 → 上传国内源 → 两处均从下载地址核对 |
-| `scripts/snug mirror <版本>` | 将 GitHub 上已公开的版本补传至国内源：安装包从 GitHub 下载，校验一致后上传；有应用内更新文件的版本一并补传 |
-| `scripts/snug media <文件…>` | 将 README 使用的图片与视频上传至国内源并输出地址；视频仅重新封装（不重新编码），并去除录制时间、地点等元数据 |
-| `scripts/snug remote-check <远控> [小时]` | 远控兼容自检（只读）：核对 Snug 依赖这家远控的几处，回看最近几小时（默认 4）的日志并输出报告；UU远程 写 `uu`，见下文「远控兼容自检」 |
-| `scripts/snug stats` | 统计安装包下载量（只读）：GitHub Release 与国内源分别计算后相加，扣除自测；口径见下文「国内源」中的「下载量」 |
+| `scripts/uuflow check` | 检查远控适配层边界，构建全部目标，运行全部 Swift 与 Python 测试 |
+| `scripts/uuflow app` | 生成并签名通用二进制 `build/UUFlow.app` |
+| `scripts/uuflow install` | 构建后安全迁移至 `/Applications/UUFlow.app`，确认新进程启动后才移除旧 `/Applications/Snug.app` |
+| `scripts/uuflow dist` | 使用 Developer ID 与公证配置生成 `dist/<版本>/UUFlow-<版本>.dmg` |
+| `scripts/uuflow remote-check uu [小时]` | UU远程 兼容自检，默认回看 4 小时，最多 72 小时 |
 
-**环境要求**：Xcode 与 Swift 6。
+环境要求为 Xcode 与 Swift 6。版本号唯一来源是仓库根目录 `VERSION`。
 
-**签名**：钥匙串中有唯一一张「Developer ID Application」证书时自动使用；否则采用 ad-hoc 签名，此时每次重新构建后都需要重新授权辅助功能。
+需要把构建缓存放到外置盘时，在不提交的 `.machine.env` 中设置 `UUFLOW_BUILD_ROOT`。脚本会把 `.build` 和 `build` 迁到该目录，源码目录只保留符号链接；示例见 `.machine.env.example`。
 
-**发布流程**
+钥匙串中有唯一一张 Developer ID Application 证书时自动使用；否则采用 ad-hoc 签名。可在不提交的 `.machine.env` 中设置：
 
-1. 修改并提交仓库根目录的 `VERSION`（版本号只记录在这里）
-2. 打上带说明的同名标签并推送：`git tag -a v2.0.0 -m "…"`。Release 的说明与 App 内的更新日志都取自标签说明：第一行去掉「Snug <版本>：」后作为标题；正文中的「安装」一节只出现在 Release 上
-3. 执行 `scripts/snug ship`
+```text
+MAC_SIGNING_IDENTITY=<证书 SHA-1 或名称；- 表示 ad-hoc>
+MAC_NOTARY_PROFILE=<notarytool 钥匙串档案名>
+```
 
-- 已发布的版本不再更改：GitHub 上已公开、而本机的安装包与之不同时，发布会被拒绝，需提升版本号
-- `ship` 中断后可直接重新执行，`dist/<版本>/` 中出自同一提交的安装包会被复用；国内源上已有且内容一致的文件会跳过
+ad-hoc 签名的 designated requirement 会随构建变化。App 从 `Snug.app` 改名迁移到 `UUFlow.app` 时，即使 bundle ID 不变，macOS 也可能保留一条表面已开启但实际失效的辅助功能记录；此时删除旧条目、重新加入 `/Applications/UUFlow.app` 一次即可。使用稳定的 Developer ID 签名时不应依赖这条 ad-hoc 迁移路径。
 
-**本机配置**存放在不纳入版本控制的 `.machine.env`（模板为 `.machine.env.example`），只记录名称，不存放密钥：
+当前仓库没有公开的 UUFlow Release，也没有运行时自动更新。`dist` 只产出本地 DMG，不上传、不生成 update feed。
 
-| 键 | 含义 |
-| :--- | :--- |
-| `MAC_SIGNING_IDENTITY` | 签名证书；`-` 表示 ad-hoc |
-| `MAC_NOTARY_PROFILE` | `xcrun notarytool store-credentials` 存储的公证档案名 |
-| `GH_CONFIG_DIR` / `GITHUB_ACCOUNT` | 发布所用的 GitHub 账号 |
-| `COS_BUCKET` / `COS_REGION` | 国内源所在的 COS 桶与地域 |
-| `COS_CREDENTIAL` / `COS_SECRETS_LOADER` | 腾讯云密钥的凭据名与按需加载器（提供 `withkey`）；环境中已有 `TENCENTCLOUD_SECRET_ID` / `TENCENTCLOUD_SECRET_KEY` 时可留空 |
-| `SPEAKMORE_STATS` | SpeakMore 仓库中的 `.stats` 目录（含 `logs/` 与 `self-ips.json`），`stats` 从中读取国内源的访问日志 |
+## 产品名与兼容身份
 
-## 国内源
+用户可见产品名、App bundle 文件名、可执行文件名和 canonical CLI 都是 `UUFlow`。以下名称暂时保留为内部兼容实现：
 
-安装包与 README 媒体同时发布到腾讯云 COS，经 CDN 分发，地址前缀为 `https://dl.zephyrxiang.com/snug/`。桶为私有，仅允许 CDN 读取。
+- Swift package/target：`Snug`、`SnugCore`、`SnugSystem`；
+- bundle ID：`com.zephyr4123.snug`；
+- 数据目录：`~/Library/Application Support/Snug`；
+- 日志：`~/Library/Logs/Snug.log`。
 
-| 路径 | 内容 | 缓存 |
-| :--- | :--- | :--- |
-| `v<版本>/Snug-<版本>.dmg`、`.sha256` | 各版本安装包，发布后不再更改 | 一年 |
-| `v<版本>/Snug-<版本>.pack`、`update.json` | 应用内更新所用的分块包及其说明（见下文「应用内更新」） | 一年 |
-| `latest/Snug.dmg` | 固定的最新版下载地址（README 与官网使用），只向更新的版本切换，下载文件名带版本号 | 5 分钟 |
-| `latest/update.json` | App 启动时检查的地址，只向更新的版本切换 | 5 分钟 |
-| `media/<名称>.<指纹>.<后缀>` | README 的图片与视频，内容变化时地址随之变化 | 一年 |
+这些名称保护现有辅助功能授权、登录项、屏幕身份、配置和还原账。不要在没有迁移方案时改动。
 
-- 每个对象记录 sha256：重复上传时内容一致即跳过，不一致即拒绝
-- 上传使用的 Python 环境位于仓库内的 `.venv`（不纳入版本控制），依赖版本锁定在 `scripts/cos-requirements.txt`，缺失时自动安装
-- GitHub 的 README 不播放外链视频：README 中的动态演示使用动图，完整视频以链接形式提供
-
-**下载量**（`scripts/snug stats`，计算位于 `scripts/download_stats.py`，单测随 `check` 运行）
-
-- GitHub Release：只计 `.dmg`。`update.json`（App 检查更新）、`.sha256` 与 `.pack` 的下载数单独列出，不计入；每个版本扣除一次 `ship` 从下载地址的核对
-- 国内源：读取 CDN 访问日志，按「传输字节 ÷ 安装包大小」折算为完整下载次数，同一 IP 同一天最多计一次；`latest/Snug.dmg` 按当时最新的版本折算
-- 国内源与 SpeakMore 共用 CDN 域名，访问日志由 SpeakMore 的 `stats` 拉取并缓存，本命令只读该缓存、不使用密钥；日志超过 6 小时未更新时会提示先刷新
-- 自测来源：SpeakMore 记录的本机出口，以及用 curl 拉取版本目录下 `update.json` 或 `.pack` 的来源（仅 `ship` / `mirror` 核对时如此）。用 curl 拉取 `media/` 或安装包的来源不视为自测：Linux 上的 curl、读取 README 的 AI 工具、替用户安装的 AI 助手都会这样请求
-
-## 应用内更新
-
-每个版本只多发布两个文件，GitHub Release 与国内源各一份，内容相同：
-
-- `Snug-<版本>.pack`：将 App 按内容切块（FastCDC，平均 128 KiB），去重后逐块 LZMA 压缩，首尾相接
-- `update.json`：版本号、2.1.0 以来各版本的更新日志，以及清单（每块在包中的位置、每个文件由哪几块组成）
-
-App 将本机已安装的 Snug 按同样方式切块，只按字节范围从最新的包中读取本机缺少的块，因此从任何旧版本都能直接升到最新版，无需逐版本的补丁。格式与打包逻辑位于 `SnugCore/Update`，发布工具 `snug-release`（`Sources/SnugRelease`）与 App 共用同一份实现：`dist` 时打包，并照清单拼装、核对签名，通过后才交出；`ship` 时生成 `update.json`。
-
-## 远控兼容自检
-
-远控更新后，先用手机照常连一次（切到 Snug 的屏），再运行 `scripts/snug remote-check <远控>`，数秒内输出报告。判定：❌ 问题 · ⚠️ 需留意 · ✅ 正常 · ℹ️ 待下次核对；有问题时以非零状态退出。各家核对什么、取证材料在哪，见各自的适配说明（[UU远程](remotes/uu.md#兼容自检)）。
+旧配置中的 `updateSource` 会被解码器忽略，新版本不再写回。以 `Snug ` 开头的旧屏幕显示名会迁移为 `UUFlow `，screen ID、serial、route 和 restore record 不变。
 
 ## 代码结构
 
-代码分为三层，加上可替换的远控适配器，依赖单向向下：
-
 | 目标 | 内容 |
 | :--- | :--- |
-| `SnugCore` | 纯逻辑：远控适配层的端口与连接判定、会话（`Remote/`）、屏幕调度（见下）、屏幕适配 `ScreenFit`、机型库 `DeviceCatalog`、手势翻译 `TouchTranslator`、截图 `Screenshots`、还原记录、配置、日志、启动参数、更新包格式。系统能力抽象为协议，测试中使用假实现 |
-| `SnugSystem` | 系统层：`CGVirtualDisplay` 建屏与撤屏、辅助进程切换分辨率档位、设主屏与还原排列 `DisplayArrangementService`、辅助功能接口移动窗口、按进程发送字号快捷键、手势事件监听 `TouchTap`、ScreenCaptureKit 截图 |
-| `RemoteUU`、`RemoteUUSystem` | UU远程 的适配器：纯逻辑一个目标、调系统一个目标（见「远控适配层」） |
-| `Snug` | 应用层：登记远控 `Remotes`、AppController、应用内更新 `Updater`、Snug 屏上的 App 资源库（`Screens/`）、指示条与截图裁剪、设置（屏幕、触控、通用三页）、添加屏幕与屏幕详情、关于、电脑屏的 App 资源库窗口、欢迎页、菜单栏 |
+| `SnugCore` | 纯逻辑：远控端口与会话、路由计划、显示调度、机型、触控状态机、配置与持久化 |
+| `SnugSystem` | 系统能力：虚拟屏、显示模式、主屏与排列、窗口、辅助功能、事件监听和截图 |
+| `RemoteUU` | UU远程 信号、会话判定与日志解析的纯逻辑 |
+| `RemoteUUSystem` | UU远程 的进程、界面、日志与诊断系统实现 |
+| `Snug` | UUFlow App 层：控制器、设置、菜单栏、欢迎页、About 和屏上界面 |
 
-发布工具 `SnugRelease` 只依赖 `SnugCore`，由 `scripts/snug` 调用。
+依赖保持单向：核心不认识具体远控；只有 `Sources/Snug/App/Remotes.swift` 登记适配器。`scripts/uuflow check` 会验证边界、测试目标与目录、适配器登记及契约驱动。
 
-测试目标与代码目标对应：`SnugCoreTests` 只用假远控；`RemoteUUTests`（`Tests/Remotes/UU`，含 UU 的推流日志夹具）；`RemoteContractTests` 是每家远控都要过的契约测试。
+## 远控与屏幕计划
 
-### 远控适配层
+`AppController` 每拍采样远控，经 `RemoteSession` 得出当前控制端，再由 `ScreenPlan.wishes` 生成计划：
 
-核心不认识任何一家远控。每家远控一个适配器，实现 `SnugCore/Remote/RemoteAdapter` 的端口：身份（日志名、界面名、自家 App、注入事件的进程），每拍交一份中性的观测（在不在场、控制端、推流屏、信号快照）。连接判定、会话、归属、建屏、手势翻译都在核心，各家共用。
+- 真实远程只接受恰好一个控制端名称及其显式 route；
+- 未识别、未绑定、冲突、目标缺失或 disabled 时返回空计划；
+- Neo route 的 `mainDuringSession` 只影响当前会话，不写入 `AppConfig.mainScreen`；
+- preview 模式仅供开发，会创建全部 enabled 屏，不能用于实机路由验收。
 
-```
-SnugSystem      → SnugCore
-RemoteUU        → SnugCore                         纯逻辑：信号怎么认、怎么算在场（只 import Foundation、SnugCore）
-RemoteUUSystem  → RemoteUU, SnugSystem, SnugCore   调系统：实现 RemoteAdapter、诊断命令
-Snug            → SnugCore, SnugSystem, RemoteUUSystem；只有 Snug/App/Remotes.swift 认识适配器
-RemoteContractTests → SnugCore, 每家的纯逻辑目标（RemoteUU）
-```
+`ScreenSet` 是显示拓扑的唯一写入者；撤临时主屏时先恢复原主屏与排列，再撤虚拟屏。物理显示模式 A 在拓扑变化期间即使短暂变为 B，结束后也必须恢复 A，不能把 B 写成永久基线。
 
-`Snug/App/Remotes.swift` 是唯一登记处：`AppController` 的适配器列表、资源库的排除名单、手势接管的进程、诊断命令都从这里取。`scripts/snug check` 先查边界：核心、系统层、核心测试的代码行不出现任何一家远控的名字，只有登记处 import 适配器，适配器的纯逻辑只依赖 SnugCore，测试目标与 `Tests/` 目录一一对应，`Sources/Remotes` 下每家都有三个目标、登记和契约驱动（条目见 [接入新的远控](remotes/README.md#防回潮)）。接一家新的远控见 [接入新的远控](remotes/README.md)。
-
-`SnugCore` 的目录依赖单向：`Model`（屏的身份 `ScreenID`、设备的类别和数值等纯值类型）← `Config`、`Persistence` ← `Screens`。配置怎么翻成屏的身份和比例只在 `ScreenPlan` 写一处。
-
-屏幕调度在 `SnugCore/Screens`，分四块，依赖单向：
-
-| 类型 | 管什么 |
-| :--- | :--- |
-| `ScreenPlan` | 纯函数：按配置、远程状态与这一拍实际读到的控制端名称算出这一刻要哪块屏（`ScreenWish`），以及该路由是否要求会话临时主屏。真实远程只接受恰好一个名称及其显式绑定；其余情况返回空计划。预览模式忽略规则并创建全部已启用屏幕。每块屏的行为只在这里按型号类别定，下游只认行为、不认类别；`Desk.State` 把它发布给界面 |
-| `ScreenSet` | 屏幕拓扑的唯一来源：加屏、撤屏、换档、换比例、重试、最短在线时间、设为主屏与还原排列；空闲时持续记录物理屏模式，临时主屏会话建立后据此排除远控先行切出的临时模式 |
-| `Desk` | 一块屏上的事：放窗口（手机、平板铺满换档，电脑只挪过来居中）、换档、字号、归位、还原记录（触屏 `placed/<屏 id>.json`，电脑屏挪过来的窗口一个一份），正在做什么按号排（`Desk.Ticket`） |
-| `DeskSet` | 管所有 `Desk`：在同一条 `SerialLane` 上排队，处理跨屏的事（窗口从一块屏转到另一块、退出 App 时各屏归位、撤屏前清场、在手机上退出某块屏）；留下的账交给 `LeftBehindLedger`，盯退出和关窗交给 `RequestWatcher` |
-
-`AppController` 每拍把各家远控的观测交给会话层（`RemoteSession`），再按会话状态调 `ScreenPlan.wishes` 交给 `DeskSet.setWishes`（结论没变就什么都不做），界面只读 `AppState.desks`（每块屏的状态）。
-
-设计令牌：`design/design-tokens.json` 是界面数值的唯一来源。`Sources/Snug/UI/DesignTokens.swift`（`MacTokens`、`TouchTokens`、`MotionTokens`）由测试生成，不手改；`DesignTokensTests` 校验两边一致。改了令牌后重新生成：
-
-```bash
-SNUG_WRITE_TOKENS=1 swift test --filter DesignTokensTests
-```
-
-手势翻译分两半：`SnugCore/Touch` 是纯状态机，一次手势只认一块范围 `TouchRegion`（位置与缩放倍数），不依赖哪块屏；`SnugSystem` 中 `TouchTap` 负责监听线程，持有每块屏的范围，按下时按落点选定这次手势用哪一块，`TouchEvents` 负责读入与拼装事件。`AppController` 只决定范围：开着手势时，每块触屏（手机、平板屏）各一块范围，正在裁剪截图的那块除外。新增一种手势时，在状态机里加判定与 `TouchCommand`，在 `TouchEvents` 里拼装要补发的事件，再在 `TouchTap` 按命令分派处补上一支。
+具体实现见 [工作原理](how-it-works.md)，新增远控见 [接入远控](remotes/README.md)。
 
 ## 启动参数
 
-参数有误时会打印用法。
-
 | 参数 | 作用 |
 | :--- | :--- |
-| `--render-<界面> <目录>` | 将界面渲染为 PNG：`settings` / `welcome` / `about` / `legacy` / `menu` / `screens` / `library` / `update`（不启动监控，不改动屏幕）。`screens` 是 Snug 屏上的面板，覆盖手机竖横、平板竖横；`library` 是电脑屏的 App 资源库窗口 |
-| `--preview-screens` | 正常启动，但不等待连接即创建屏幕列表中开着的屏，无需控制端即可查看屏上的列表（**会真实创建屏幕**；设了主屏的同样会设） |
-| `--dump-remote <远控>` | 打印从这家远控读取到的原始信号与当前屏幕；UU远程（`uu`）是界面里的文字、表格与行、认出的控制端 |
-| `--check-remote <远控> [小时]` | 远控兼容自检（`scripts/snug remote-check` 调用）：输出报告，有问题时以非零状态退出；回看默认 4 小时，最多 72 |
-| `--probe-screens <规格…>` | 实测用（多屏的 V1～V12，结论见记忆 project-multi-screen）：每份规格建一块实验屏，打印各档模式与 2 倍是否可用，按 Ctrl-C 撤屏并还原排布。规格是逗号分隔的 `键=值`：`modes=宽x高+…`（必填）、`name`、`serial`（默认用 999000001 起的实验身份）、`cap=像素宽x像素高`、`pattern=on\|off`（校准图）、`main=on`（设为主屏，最多一块）。**会真实创建屏幕**，测试时随测随撤，免得指针跑到看不见的屏上 |
-| `--set-mode <屏幕编号> <宽> <高>` | 辅助进程模式：将一块 Snug 的屏切换至该档的 2 倍模式后立即退出（供主程序内部调用；高由主程序按型号的比例算好传入） |
-| `--restore-mode <屏幕编号> <模式编号> <宽> <高> <像素宽> <像素高> <刷新率> session\|permanent` | 辅助进程模式：将一块屏幕设回该模式后立即退出，只对当前登录生效或连同永久配置（供主程序内部调用：创建、移除 Snug 的屏时被系统改变模式的屏幕） |
+| `--render-<界面> <目录>` | 渲染 `settings` / `welcome` / `about` / `legacy` / `menu` / `screens` / `library`，不启动监控 |
+| `--preview-screens` | 不等远程创建 enabled 屏；会真实改变显示拓扑 |
+| `--dump-remote <远控>` | 打印该远控的原始信号、控制端与屏幕 |
+| `--check-remote <远控> [小时]` | 输出兼容性报告 |
+| `--probe-screens <规格…>` | 创建实验虚拟屏；会真实改变显示拓扑 |
+| `--set-mode ...` / `--restore-mode ...` | App 内部显示模式帮助进程入口 |
 
 ## 数据与日志
 
 | 位置 | 内容 |
 | :--- | :--- |
-| `~/Library/Application Support/Snug/config.json` | 设置，含屏幕列表 `screens`、控制端精确匹配规则 `controllerBindings`（可用 `mainDuringSession` 让命中的目标屏只在当前会话临时成为主屏），以及为旧配置和预览保留的 `mainScreen`。兼容 2.5 的 `phoneScreen`、`phone` 取第一块竖屏手机，也支持沿用原先那块已识别为 iPad 的竖屏。旧字段过两个大版本再停写。降级后，旧版会丢掉新字段 |
-| `~/Library/Application Support/Snug/placed/<屏 id>.json` | 各块屏上窗口的还原记录；电脑屏挪过来的窗口一个一份，`placed/<屏 id>~<pid>-<窗口号>.json`。2.5 的 `phone-screen.json` 启动时挪成 `placed/phone.json` 再按它还原；手机屏已经有账时挪成 `placed/phone-2.5.json`，一样还 |
-| `~/Library/Application Support/Snug/zoom.json` | 各 App 记忆的字号级数 |
-| `~/Library/Application Support/Snug/left-behind.json` | 在 Snug 之外关闭的窗口待还原的位置与字号（保留两周） |
-| `~/Library/Logs/Snug.log` | 日志 |
+| `~/Library/Application Support/Snug/config.json` | 屏幕、精确控制端 routes、触控设置与兼容字段 |
+| `~/Library/Application Support/Snug/placed/` | 各屏窗口还原记录 |
+| `~/Library/Application Support/Snug/zoom.json` | 各 App 字号级数 |
+| `~/Library/Application Support/Snug/left-behind.json` | 未能立即恢复的窗口记录 |
+| `~/Library/Logs/Snug.log` | 运行日志 |
 
-实现细节见 [工作原理](how-it-works.md)。
+数据路径保留旧名是明确的兼容策略，不应作为 UI 品牌展示。

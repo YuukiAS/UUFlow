@@ -1,5 +1,5 @@
-// 欢迎页：第一次打开时出现，系统引导页的样子：顶部 App 图标，三项讲清 Snug 怎么用，底部「稍后 / 授权…」。
-// 授权由 PermissionFlow 打开系统设置，旁边浮出一个小窗口，把 Snug 拖进列表即可。之后缺权限时从设置里也能再打开。
+// 欢迎页：第一次打开时出现，系统引导页的样子：顶部 App 图标，三项讲清 UUFlow 怎么用，底部「稍后 / 授权…」。
+// 授权由 PermissionFlow 打开系统设置，旁边浮出一个小窗口，把 UUFlow 拖进列表即可。之后缺权限时从设置里也能再打开。
 // 授权状态读 AppState（AppController 每拍刷新），这里不自己轮询
 import AppKit
 import SwiftUI
@@ -16,11 +16,11 @@ struct WelcomeView: View {
                 Image(nsImage: NSApp.applicationIconImage)
                     .resizable()
                     .frame(width: 80, height: 80)
-                Text("欢迎使用 Snug").font(.largeTitle.bold())
+                Text("欢迎使用 UUFlow").font(.largeTitle.bold())
                 Text("远程 Mac 的显示与触控增强").foregroundStyle(.secondary)
             }
             VStack(alignment: .leading, spacing: 20) {
-                Feature(symbol: "rectangle.on.rectangle", title: "选择 Snug 的屏", detail: "UU远程 屏幕列表中切换；不切换则一切如常")
+                Feature(symbol: "rectangle.on.rectangle", title: "选择 UUFlow 的屏", detail: "在 UU远程 的屏幕列表中切换；不切换则一切如常")
                 Feature(symbol: "hand.point.up.left.fill", title: "点选 App 或窗口", detail: "铺满这块屏，手机和平板上字号自动放大")
                 Feature(symbol: "hand.draw.fill", title: "触控手势", detail: "单指滚动 · 长按选择 · 长按松开右键")
             }
@@ -85,7 +85,7 @@ final class WelcomeWindowController {
                 self?.window?.close()
             }))
             w.styleMask = [.titled, .closable]
-            w.title = "Snug"
+            w.title = "UUFlow"
             w.isReleasedWhenClosed = false
             w.center()
             closeObserver = NotificationCenter.default.addObserver(forName: NSWindow.willCloseNotification, object: w,

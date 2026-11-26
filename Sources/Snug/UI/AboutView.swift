@@ -1,4 +1,4 @@
-// 「关于 Snug」：独立的小窗口，只放名称、版本、链接、致谢与免责声明（软件更新在设置的通用页）
+// 「关于 UUFlow」：独立的小窗口，只放名称、版本、链接、致谢与免责声明
 import AppKit
 import SwiftUI
 import SnugCore
@@ -10,6 +10,8 @@ struct AboutView: View {
     }
 
     private let credits = [
+        Credit(name: "Snug", url: "https://github.com/zephyr4123/snug",
+               author: "zephyr4123", usage: "MIT 上游项目"),
         Credit(name: "UUyc-companion", url: "https://github.com/aoyamashou/UUyc-companion",
                author: "AoyamaShou", usage: "项目前身"),
         Credit(name: "PermissionFlow", url: "https://github.com/jaywcjlove/PermissionFlow",
@@ -29,11 +31,11 @@ struct AboutView: View {
                         .frame(width: 64, height: 64)
                     VStack(alignment: .leading, spacing: 4) {
                         HStack(alignment: .firstTextBaseline, spacing: 8) {
-                            Text("Snug").font(.title2.bold())
-                            Text(Updater.current?.description ?? "开发版").foregroundStyle(.secondary).monospacedDigit()
+                            Text(AppIdentity.name).font(.title2.bold())
+                            Text(AppIdentity.versionText).foregroundStyle(.secondary).monospacedDigit()
                         }
                         Text("远程 Mac 的显示与触控增强")
-                        Link("github.com/zephyr4123/snug", destination: URL(string: "https://github.com/zephyr4123/snug")!)
+                        Link("github.com/YuukiAS/UUFlow", destination: AppIdentity.repository)
                     }
                 }
                 .padding(.vertical, 4)
@@ -70,7 +72,7 @@ final class AboutWindowController {
     func show(on display: DisplayID? = nil, activating: Bool = true) {
         if window == nil {
             // 先定尺寸再居中（NSWindow(hosting:)），否则按 0×0 居中，窗口偏到右下
-            let w = NSWindow(hosting: AboutView(), title: "关于 Snug")
+            let w = NSWindow(hosting: AboutView(), title: "关于 UUFlow")
             w.titlebarAppearsTransparent = true
             window = w
         }

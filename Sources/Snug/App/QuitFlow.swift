@@ -1,4 +1,4 @@
-// 退出流程：先把各块屏上的窗口放回去、撤掉 Snug 的屏，再退出。
+// 退出流程：先把各块屏上的窗口放回去、撤掉 UUFlow 的屏，再退出。
 // - 用户点「退出」、kill 发的 SIGTERM：在正常的 run loop 里收尾，收完才 terminate，不依赖 terminateLater
 // - 系统注销、重启、关机：绝不取消（会打断注销流程）。返回 terminateLater，尽力收尾，最多等 systemQuitTimeout 就放行；
 //   没收完的交给下次启动按还原记录处理
@@ -8,7 +8,7 @@ import SnugCore
 
 @MainActor
 final class QuitFlow {
-    /// scripts/snug install 用 SIGTERM 退出 Snug 后最多等 20 秒，改这个数要一起看那边
+    /// scripts/uuflow install 用 SIGTERM 退出 UUFlow 后最多等 20 秒，改这个数要一起看那边
     static let userQuitTimeout: TimeInterval = 15
     static let systemQuitTimeout: TimeInterval = 4
 
@@ -34,7 +34,7 @@ final class QuitFlow {
     func userQuit() {
         guard phase == .running else { return }
         phase = .finishing
-        Log.info("用户退出 Snug")
+        Log.info("用户退出 UUFlow")
         controller.finishForQuit(timeout: Self.userQuitTimeout) { [weak self] in self?.finished() }
     }
 
@@ -54,7 +54,7 @@ final class QuitFlow {
 
     private func finished() {
         phase = .done
-        Log.info("退出 Snug")
+        Log.info("退出 UUFlow")
         Log.flush()
         if replyPending {
             replyPending = false

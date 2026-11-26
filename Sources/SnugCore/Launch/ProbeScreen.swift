@@ -25,7 +25,7 @@ public struct ProbeScreen: Equatable, Sendable {
     }
 
     public static let firstSerial: UInt32 = 999_000_001
-    public static let baseName = "Snug 实验屏"
+    public static let baseName = "UUFlow 实验屏"
 
     /// 「显示器」设置和 UU远程 屏幕列表里的名字
     public var name: String

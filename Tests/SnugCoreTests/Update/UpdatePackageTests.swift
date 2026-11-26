@@ -2,11 +2,11 @@ import Foundation
 import Testing
 @testable import SnugCore
 
-/// 照 Snug.app 的样子在临时目录里摆一个假的应用包：一个大的可执行文件、几个小文件、一个空文件
+/// 照 UUFlow.app 的样子在临时目录里摆一个假的应用包：一个大的可执行文件、几个小文件、一个空文件
 private func makeApp(at root: URL, binary: Data, plist: String) throws {
     let fm = FileManager.default
     let files: [(String, Data, Bool)] = [
-        ("Contents/MacOS/Snug", binary, true),
+        ("Contents/MacOS/UUFlow", binary, true),
         ("Contents/Info.plist", Data(plist.utf8), false),
         ("Contents/Resources/AppIcon.icns", randomBytes(90_000, seed: 7), false),
         ("Contents/Resources/Flow.bundle/Contents/Resources/en.lproj/Localizable.strings", Data("\"a\" = \"b\";".utf8), false),
@@ -48,10 +48,10 @@ struct UpdatePackageTests {
     @Test("打包再整包解开，拼出的应用包和原来逐字节一样（含可执行位、空文件）")
     func roundTrip() throws {
         let dir = try TempDir()
-        let app = dir.url.appendingPathComponent("Snug.app"), out = dir.url.appendingPathComponent("out.app")
+        let app = dir.url.appendingPathComponent("UUFlow.app"), out = dir.url.appendingPathComponent("out.app")
         try makeApp(at: app, binary: binary, plist: "<plist>2.1.0</plist>")
-        let (package, pack) = try UpdatePackage.make(app: app, file: "Snug-2.1.0.pack")
-        #expect(package.file == "Snug-2.1.0.pack")
+        let (package, pack) = try UpdatePackage.make(app: app, file: "UUFlow-2.1.0.pack")
+        #expect(package.file == "UUFlow-2.1.0.pack")
         #expect(package.missingRanges(have: [:]) == [0..<pack.count])
         try package.assemble(into: out, from: package.unpack(pack, at: 0..<pack.count))
         try expectSameTree(app, out)
@@ -60,12 +60,12 @@ struct UpdatePackageTests {
     @Test("同样的内容只进包一次")
     func dedups() throws {
         let dir = try TempDir()
-        let app = dir.url.appendingPathComponent("Snug.app")
+        let app = dir.url.appendingPathComponent("UUFlow.app")
         try makeApp(at: app, binary: binary, plist: "p")
         try binary.write(to: app.appendingPathComponent("Contents/MacOS/Copy"))
         let (package, _) = try UpdatePackage.make(app: app, file: "x.pack")
         #expect(Set(package.chunks.map(\.sha256)).count == package.chunks.count)
-        let snug = try #require(package.files.first { $0.path == "Contents/MacOS/Snug" })
+        let snug = try #require(package.files.first { $0.path == "Contents/MacOS/UUFlow" })
         let copy = try #require(package.files.first { $0.path == "Contents/MacOS/Copy" })
         #expect(snug.chunks == copy.chunks)
     }
@@ -80,7 +80,7 @@ struct UpdatePackageTests {
         changed.insert(contentsOf: randomBytes(3000, seed: 12), at: 700_000)
         try makeApp(at: new, binary: changed, plist: "<plist>2.2.0</plist>")
 
-        let (package, pack) = try UpdatePackage.make(app: new, file: "Snug-2.2.0.pack")
+        let (package, pack) = try UpdatePackage.make(app: new, file: "UUFlow-2.2.0.pack")
         var chunks = try UpdatePackage.chunks(in: old)
         let ranges = package.missingRanges(have: chunks)
         #expect(!ranges.isEmpty)
@@ -95,7 +95,7 @@ struct UpdatePackageTests {
     @Test("取回的内容坏了、短了，或者缺块，都不拼")
     func rejectsBadChunks() throws {
         let dir = try TempDir()
-        let app = dir.url.appendingPathComponent("Snug.app")
+        let app = dir.url.appendingPathComponent("UUFlow.app")
         try makeApp(at: app, binary: binary, plist: "p")
         let (package, pack) = try UpdatePackage.make(app: app, file: "x.pack")
         var broken = pack
@@ -110,10 +110,10 @@ struct UpdatePackageTests {
     @Test("包里不收符号链接：拼的时候不做，发布时就拦下")
     func rejectsSymlinks() throws {
         let dir = try TempDir()
-        let app = dir.url.appendingPathComponent("Snug.app")
+        let app = dir.url.appendingPathComponent("UUFlow.app")
         try makeApp(at: app, binary: binary, plist: "p")
         try FileManager.default.createSymbolicLink(atPath: app.appendingPathComponent("Contents/link").path,
-                                                   withDestinationPath: "MacOS/Snug")
+                                                   withDestinationPath: "MacOS/UUFlow")
         #expect(throws: UpdateError.self) { try UpdatePackage.make(app: app, file: "x.pack") }
     }
 }
@@ -121,7 +121,7 @@ struct UpdatePackageTests {
 @Suite("update.json UpdateFeed")
 struct UpdateFeedTests {
     private func feed(files: [UpdatePackage.File], chunks: [UpdatePackage.Chunk] = [], format: Int = UpdateFeed.format) -> Data {
-        let package = UpdatePackage(file: "Snug-2.2.0.pack", chunks: chunks, files: files)
+        let package = UpdatePackage(file: "UUFlow-2.2.0.pack", chunks: chunks, files: files)
         var json = try! JSONSerialization.jsonObject(with: JSONEncoder().encode(
             UpdateFeed(version: Version(major: 2, minor: 2, patch: 0), releases: [], package: package))) as! [String: Any]
         json["format"] = format
@@ -150,7 +150,7 @@ struct UpdateFeedTests {
         }
     }
 
-    @Test("包的文件名只能是一个普通的名字", arguments: ["", "../Snug.pack", "a/b.pack"])
+    @Test("包的文件名只能是一个普通的名字", arguments: ["", "../UUFlow.pack", "a/b.pack"])
     func rejectsBadPackName(name: String) {
         let package = UpdatePackage(file: name, chunks: [], files: [])
         let data = try! JSONEncoder().encode(UpdateFeed(version: Version(major: 2, minor: 2, patch: 0), releases: [], package: package))
@@ -186,7 +186,7 @@ struct UpdateFeedTests {
 @Suite("更新日志 ReleaseNote")
 struct ReleaseNoteTests {
     private let message = """
-    Snug 2.0.1：修复远程约一分钟后手机屏被误移除
+    UUFlow 2.0.1：修复远程约一分钟后手机屏被误移除
 
     修复
     - 主窗口停留在首页时，手机屏会被误判为断开并移除（#1）
@@ -196,12 +196,12 @@ struct ReleaseNoteTests {
     - `--preview-screens` 不等远程就建屏
 
     安装
-    - 退出旧版后，下载 Snug-2.0.1.dmg，拖入「应用程序」替换即可
+    - 退出旧版后，下载 UUFlow-2.0.1.dmg，拖入「应用程序」替换即可
 
     感谢 @gaofeng21cn 定位这个问题（#2）。
     """
 
-    @Test("标签说明 → 更新日志：第一行去掉「Snug 版本：」当标题，「安装」一节不要")
+    @Test("标签说明 → 更新日志：第一行去掉「UUFlow 版本：」当标题，「安装」一节不要")
     func fromTag() {
         let note = ReleaseNote(version: Version(major: 2, minor: 0, patch: 1), date: "2026-11-14", tagMessage: message)
         #expect(note.title == "修复远程约一分钟后手机屏被误移除")

@@ -4,10 +4,11 @@ import Testing
 
 @Suite("配置 AppConfig")
 struct ConfigModelTests {
-    @Test("默认值：只有一块开着的竖屏手机屏（17 Pro Max），不改主屏；手势开着，截图键关着，字号默认放大 2 级，还没看过欢迎页，从腾讯云更新")
+    @Test("默认值：只有一块开着的竖屏手机屏（17 Pro Max），没有控制端绑定、不改主屏；手势开着，截图键关着，字号默认放大 2 级，还没看过欢迎页，从腾讯云更新")
     func defaults() {
         let c = AppConfig()
         #expect(c.screens == [.legacyPhone(.standard, enabled: true)])
+        #expect(c.controllerBindings.isEmpty)
         #expect(c.mainScreen == nil)
         #expect(c.gestures)
         #expect(!c.screenshot)
@@ -173,6 +174,91 @@ struct ConfigModelTests {
         #expect(c.mainScreen == nil)
     }
 
+    @Test("控制端绑定写盘后可读回；删掉被绑定的屏后保留为旁路，不留下悬空屏号")
+    func controllerBindingsRoundTripAndRemoval() throws {
+        var c = AppConfig()
+        let tablet = c.addScreen(orientation: .landscape, device: DeviceChoice(model: nil, screen: DeviceScreen(width: 1640, height: 2360), kind: .tablet))!
+        c.bindController("LEGION-Y9000P", to: nil)
+        c.bindController("Alice iPad", to: tablet.id)
+        let loaded = try JSONDecoder().decode(AppConfig.self, from: JSONEncoder().encode(c))
+        #expect(loaded.controllerBindings == c.controllerBindings)
+        #expect(loaded.binding(for: "LEGION-Y9000P")?.screen == nil)
+        #expect(loaded.binding(for: "Alice iPad")?.screen == tablet.id)
+
+        c.removeScreen(tablet.id)
+        #expect(c.binding(for: "Alice iPad")?.screen == nil)
+        #expect(!c.controllerBindings.contains { $0.screen == tablet.id })
+    }
+
+    @Test("一加、iPad、ThinkPad 与 Neo 的真实名称映射可持久化；删屏后对应映射失效")
+    func deviceBindingsRoundTripAndRemoval() throws {
+        let onePlusName = "一加 12 全网通版"
+        let ipadName = "iPad Air 5"
+        let thinkPadName = "THINKPAD-E16"
+        let neoName = "MacBook-Neo"
+        let legionName = "LEGION-Y9000P"
+        var c = AppConfig()
+        c.screens[0] = ScreenConfig(
+            id: .phone,
+            orientation: .landscape,
+            device: DeviceChoice(model: "一加 12", screen: DeviceScreen(width: 1440, height: 3168), kind: .phone),
+            name: "Snug 一加 12 横屏",
+            serials: [1]
+        )
+        let added = c.addScreen(
+            orientation: .landscape,
+            device: DeviceChoice(
+                model: "Apple iPad Air（第 5 代）",
+                screen: DeviceScreen(width: 1640, height: 2360, points: 820),
+                kind: .tablet
+            ),
+            name: "iPad Air M1"
+        )
+        let ipad = try #require(added)
+        let computer = c.addScreen(
+            orientation: .landscape,
+            device: DeviceChoice(model: nil, screen: DeviceScreen(width: 720, height: 1280), kind: .computer),
+            name: "ThinkPad E16"
+        )
+        let thinkPad = try #require(computer)
+        let neoComputer = c.addScreen(
+            orientation: .landscape,
+            device: DeviceChoice(model: nil, screen: DeviceScreen(width: 881, height: 1408), kind: .computer),
+            name: "MacBook Neo"
+        )
+        let neo = try #require(neoComputer)
+        c.bindController(onePlusName, to: .phone)
+        c.bindController(ipadName, to: ipad.id)
+        c.bindController(thinkPadName, to: thinkPad.id)
+        c.bindController(neoName, to: neo.id, mainDuringSession: true)
+        c.bindController(legionName, to: nil)
+
+        let loaded = try JSONDecoder().decode(AppConfig.self, from: JSONEncoder().encode(c))
+        #expect(loaded.binding(for: onePlusName)?.screen == .phone)
+        #expect(loaded.binding(for: ipadName)?.screen == ipad.id)
+        #expect(loaded.binding(for: thinkPadName)?.screen == thinkPad.id)
+        #expect(loaded.binding(for: neoName)?.screen == neo.id)
+        #expect(loaded.binding(for: neoName)?.mainDuringSession == true)
+        #expect(loaded.binding(for: legionName)?.screen == nil)
+        #expect(loaded.screens.first { $0.id == thinkPad.id }?.device.screen == DeviceScreen(width: 720, height: 1280))
+        #expect(loaded.screens.first { $0.id == neo.id }?.device.screen == DeviceScreen(width: 881, height: 1408))
+
+        c.removeScreen(neo.id)
+        #expect(c.binding(for: neoName)?.screen == nil)
+        #expect(c.binding(for: neoName)?.mainDuringSession == false)
+        #expect(c.binding(for: onePlusName)?.screen == .phone)
+        #expect(c.binding(for: ipadName)?.screen == ipad.id)
+        #expect(c.binding(for: thinkPadName)?.screen == thinkPad.id)
+        #expect(c.binding(for: legionName)?.screen == nil)
+    }
+
+    @Test("配置中的空名称、重复名称和悬空屏号会安全收敛；悬空绑定变成旁路")
+    func sanitizesControllerBindings() throws {
+        let json = #"{"screens":[{"id":"phone","orientation":"portrait","device":{"screen":{"width":1320,"height":2868,"points":440},"kind":"phone"},"enabled":true,"name":"Snug 手机屏","serials":[200000108]}],"controllerBindings":[{"name":"","screen":"phone"},{"name":"Neo","screen":"missing"},{"name":"Neo","screen":"phone"}]}"#
+        let c = try decode(json)
+        #expect(c.controllerBindings == [ControllerBinding(name: "Neo", screen: nil)])
+    }
+
     @Test("手改坏了的屏幕列表：分辨率不对、没有序列号、id 重复的那一项丢掉；主屏指向没有的屏当作不改")
     func sanitizesScreens() throws {
         let good = #"{"id":"a","orientation":"landscape","device":{"screen":{"width":1080,"height":1920},"kind":"computer"},"enabled":true,"name":"A","serials":[1,2,3]}"#
@@ -230,6 +316,8 @@ struct ConfigModelTests {
         var c = AppConfig()
         c.screens[0].enabled = false
         c.mainScreen = .phone
+        c.bindController("LEGION-Y9000P", to: nil)
+        c.bindController("MacBook Neo", to: .phone, mainDuringSession: true)
         c.screenshot = true
         c.zoomSteps = 3
         c.welcomed = true
@@ -238,6 +326,19 @@ struct ConfigModelTests {
         c.screens[0].device = DeviceChoice(model: "华为 Mate 70 Pro", screen: DeviceScreen(width: 1260, height: 2832))
         c.addScreen(orientation: .landscape, device: DeviceChoice(model: nil, screen: DeviceScreen(width: 1600, height: 2560, notch: 30), kind: .computer))
         #expect(try JSONDecoder().decode(AppConfig.self, from: JSONEncoder().encode(c)) == c)
+    }
+
+    @Test("控制端临时主屏规则正常持久化；旧配置默认关闭，且不会写入常驻 mainScreen")
+    func controllerSessionMainRoundTrip() throws {
+        let old = try decode(#"{"controllerBindings":[{"name":"MacBook-Neo","screen":"phone"}]}"#)
+        #expect(old.binding(for: "MacBook-Neo")?.mainDuringSession == false)
+        #expect(old.mainScreen == nil)
+
+        var current = AppConfig()
+        current.bindController("MacBook-Neo", to: .phone, mainDuringSession: true)
+        let loaded = try JSONDecoder().decode(AppConfig.self, from: JSONEncoder().encode(current))
+        #expect(loaded.binding(for: "MacBook-Neo")?.mainDuringSession == true)
+        #expect(loaded.mainScreen == nil)
     }
 
     @Test("2.6.2 及以前的「设为主屏」只在远程时生效：升到常驻的版本时撤掉，要在设置里看过确认框重新选；同版本、开发版、新装、没设过的不动")

@@ -65,6 +65,7 @@ final class RenderStub: AppIntents, TouchIntents, Navigation {
     func setScreenEnabled(_ id: ScreenID, _ on: Bool) {}
     func addScreen(orientation: Orientation, device: DeviceChoice, name: String) {}
     func removeScreen(_ id: ScreenID) {}
+    func bindController(_ name: String, to screen: ScreenID?) {}
     func setScreenDevice(_ id: ScreenID, _ device: DeviceChoice) {}
     func renameScreen(_ id: ScreenID, _ name: String) {}
     func setMainScreen(_ id: ScreenID?) {}

@@ -2,12 +2,14 @@
 import Foundation
 import RemoteUU
 import SnugCore
+import SnugSystem
 
 @MainActor
 package final class UURemoteAdapter: RemoteAdapter {
     package static let identity = UURemote.identity
     private let controllers = ControllerReader()
     private let captureLog = CaptureLogWatcher()
+    private var interfaceRecovery = ControllerInterfaceRecovery()
 
     package init() {}
 
@@ -19,7 +21,13 @@ package final class UURemoteAdapter: RemoteAdapter {
 
     package func sample(wallClock: Date) -> RemoteObservation {
         let capture = captureLog.sample(at: wallClock)
-        return UUSignals(overlayVisible: UURemoteApp.overlayVisible(), controllers: controllers.poll(), captureActive: capture.active)
+        let overlay = UURemoteApp.overlayVisible()
+        let table = controllers.poll()
+        if AX.isTrusted,
+           interfaceRecovery.shouldOpen(present: overlay || capture.active == true, controllers: table, now: wallClock) {
+            UURemoteApp.openInterfaceInBackground()
+        }
+        return UUSignals(overlayVisible: overlay, controllers: table, captureActive: capture.active)
             .observation(streamedDisplay: capture.display)
     }
 }

@@ -100,6 +100,17 @@ struct RemoteSessionTests {
         #expect(s.controllers == ["iPhone"])
     }
 
+    @Test("当前一拍读不到控制端名称时，路由看到空列表，不沿用会话里记住的旧名称")
+    func observedControllersDoNotGuess() {
+        var s = RemoteSession()
+        _ = update(&s, present("iPhone"), 0)
+        #expect(s.controllers == ["iPhone"])
+        #expect(s.observedControllers == ["iPhone"])
+        #expect(update(&s, present(), 0.5) == [])
+        #expect(s.controllers == ["iPhone"])
+        #expect(s.observedControllers.isEmpty)
+    }
+
     @Test("回归 #1：在场却一直没认出控制端，300 秒也不断开；不在场后照常 interrupted、ended")
     func unrecognizedControllersKeepSession() {
         var s = RemoteSession()

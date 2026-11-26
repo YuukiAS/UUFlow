@@ -2,9 +2,11 @@
 import Foundation
 
 public struct AppConfig: Codable, Equatable, Sendable {
-    /// 屏幕列表：远程时建出开着的那几块，设为主屏的那块常驻（见 ScreenPlan）。新装只有一块竖屏手机屏
+    /// 屏幕列表：控制端只建它绑定的那一块；新装只有一块竖屏手机屏
     public var screens = [ScreenConfig.legacyPhone(.standard, enabled: true)]
-    /// 设为主屏的那块，常驻、不随远程建撤；nil 表示不改主屏（默认）
+    /// 控制端名称 → 屏幕；screen 为 nil 表示显式旁路。没有规则的名称也旁路
+    public var controllerBindings: [ControllerBinding] = []
+    /// 旧版设为主屏配置；真实远程中停用，只供旧配置清理和显式预览使用。nil 表示不改主屏（默认）
     public var mainScreen: ScreenID?
     /// 下一块新加的屏至少用哪一段序列号（只增不减：删掉的屏的号也不回收，免得系统把旧屏的记忆套到新屏上）
     public var nextSerialBlock = 0
@@ -64,6 +66,27 @@ public struct AppConfig: Codable, Equatable, Sendable {
     public mutating func removeScreen(_ id: ScreenID) {
         screens.removeAll { $0.id == id }
         if mainScreen == id { mainScreen = nil }
+        for i in controllerBindings.indices where controllerBindings[i].screen == id {
+            controllerBindings[i].screen = nil
+            controllerBindings[i].mainDuringSession = false
+        }
+    }
+
+    /// 同名规则只有一条；空名称不收。nil 是显式旁路，不是删除规则。临时主屏只对有目标屏的规则有效。
+    public mutating func bindController(_ name: String, to screen: ScreenID?, mainDuringSession: Bool = false) {
+        let name = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !name.isEmpty else { return }
+        let screen = screen.flatMap { id in screens.contains { $0.id == id } ? id : nil }
+        if let i = controllerBindings.firstIndex(where: { $0.name == name }) {
+            controllerBindings[i].screen = screen
+            controllerBindings[i].mainDuringSession = screen != nil && mainDuringSession
+        } else {
+            controllerBindings.append(ControllerBinding(name: name, screen: screen, mainDuringSession: mainDuringSession))
+        }
+    }
+
+    public func binding(for controller: String) -> ControllerBinding? {
+        controllerBindings.first { $0.name == controller }
     }
 
     /// 2.6.2 及以前「设为主屏」只在远程时生效，之后改为常驻、一启动就接管 Mac 主屏（#28）。从这些版本升上来的，
@@ -83,7 +106,7 @@ public struct AppConfig: Codable, Equatable, Sendable {
     }
 
     private enum CodingKeys: String, CodingKey {
-        case screens, mainScreen, nextSerialBlock, phoneScreen, gestures, screenshot, zoomSteps, phone, welcomed, updateSource, lastVersion
+        case screens, controllerBindings, mainScreen, nextSerialBlock, phoneScreen, gestures, screenshot, zoomSteps, phone, welcomed, updateSource, lastVersion
     }
 
     // 每一项都有默认值：以后加字段、或者手改漏了某项，都不会让整份配置被判为损坏
@@ -113,6 +136,17 @@ public struct AppConfig: Codable, Equatable, Sendable {
             let phone = (try? c.decodeIfPresent(DeviceChoice.self, forKey: .phone)).flatMap { $0.screen.isValid ? $0 : nil } ?? .standard
             screens = [.legacyPhone(phone, enabled: enabled)]
         }
+        var seenControllers = Set<String>()
+        controllerBindings = ((try? c.decodeIfPresent([ControllerBinding].self, forKey: .controllerBindings)) ?? []).compactMap { binding in
+            let name = binding.name.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !name.isEmpty, seenControllers.insert(name).inserted else {
+                Log.warn("配置里的控制端规则名称为空或重复，丢掉这一项")
+                return nil
+            }
+            let screen = binding.screen.flatMap { id in screens.contains { $0.id == id } ? id : nil }
+            if binding.screen != nil, screen == nil { Log.warn("控制端「\(name)」绑定的屏已不存在，改为旁路") }
+            return ControllerBinding(name: name, screen: screen, mainDuringSession: screen != nil && binding.mainDuringSession)
+        }
         mainScreen = (try? c.decodeIfPresent(ScreenID.self, forKey: .mainScreen)).flatMap { id in screens.contains { $0.id == id } ? id : nil }
         nextSerialBlock = ((try? c.decodeIfPresent(Int.self, forKey: .nextSerialBlock)) ?? 0).clamped(to: 0...Self.maxSerialBlock)
         gestures = try c.decodeIfPresent(Bool.self, forKey: .gestures) ?? d.gestures
@@ -138,6 +172,7 @@ extension AppConfig {
     public func encode(to encoder: any Encoder) throws {
         var c = encoder.container(keyedBy: CodingKeys.self)
         try c.encode(screens, forKey: .screens)
+        try c.encode(controllerBindings, forKey: .controllerBindings)
         try c.encodeIfPresent(mainScreen, forKey: .mainScreen)
         try c.encode(nextSerialBlock, forKey: .nextSerialBlock)
         // 2.5 按保存的型号和尺寸建屏。没有可沿用的屏时，写成关着的默认手机。

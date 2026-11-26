@@ -28,6 +28,9 @@ Built for UU Remote · Display and touch enhancements for remote Macs<br>A dedic
 
 > Continued from [aoyamashou/UUyc-companion](https://github.com/aoyamashou/UUyc-companion) (UU Remote Companion by AoyamaShou, MIT License), with the original copyright notices and commit history fully preserved. Redesigned around the phone screen in 2.0; extended to tablets and computers in 2.6.
 
+> [!NOTE]
+> **UUFlow fork:** the current build creates a virtual screen only when exactly one controller name reported by UU Remote matches an explicit user rule. Unknown, unconfigured, multiple, or bypassed names leave UU Remote unchanged. A real remote session never uses the legacy persistent main-display behavior. The Chinese README contains the current UUFlow workflow; untranslated sections below still describe upstream Snug.
+
 ## 📥 Download
 
 <img src="Assets/AppIcon/AppIcon-1024.png" width="88" align="left" alt="Snug icon">

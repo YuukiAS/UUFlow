@@ -41,6 +41,20 @@ private extension Rig {
 @Suite("多块屏 DeskSet")
 @MainActor
 struct DeskSetTests {
+    @Test("旁路结论交给下游时不建屏、不搬窗口，也没有可启用触控翻译的 Desk")
+    func bypassIsNoop() async throws {
+        let rig = try Rig()
+        var config = AppConfig()
+        config.bindController("LEGION-Y9000P", to: nil)
+        let wishes = ScreenPlan.wishes(config: config, remote: true, controllers: ["LEGION-Y9000P"], trusted: true)
+        rig.set.setWishes(wishes)
+        await rig.set.idle()
+        #expect(wishes.isEmpty)
+        #expect(rig.set.state.desks.isEmpty)
+        #expect(rig.journal.all.isEmpty)
+        #expect(rig.windows.window(ghostty.key)?.frame == ghosttyHome)
+    }
+
     @Test("两块屏一批建：前后只拍一次快照、只善后一次；各用各的身份")
     func createsTogether() async throws {
         let rig = try Rig()

@@ -33,39 +33,45 @@ UUFlow 复用现有“本机被控中”控制端读取能力，根据 UU 实际
 
 - **一加 12**：专属横屏已配置并完成自动路由。UU 实际名称为“一加 12 全网通版”。
 - **iPad Air M1**：按 iPad Air 第 5 代配置横屏，1640×2360、points 820；自动路由已完成。UU 实际名称为“iPad Air 5”。
-- **MacBook Neo**：电脑横屏已经准备，自定义逻辑分辨率 1408×881、无刘海。自动路由留到下一次 Neo 在场时完成，不阻塞其他设备。
-- **ThinkPad E16**：面板为 2560×1600、16:10。专属电脑屏采用自定义逻辑分辨率 **1280×800** 作为基准：与 Windows 200% 缩放的逻辑工作区一致，2 倍模式正好对应 2560×1600；Snug 仍可提供更宽档位，需要更多工作区时可再调高。Windows 当前 225% 只作为本机文字大小偏好的参考，不把 1138×711 这种非整数缩放结果写成固定虚拟屏规格。
-- **Legion Y9000P**：保持旁路，不创建 UUFlow 虚拟屏，不改变 Mac mini 显示拓扑。
+- **MacBook Neo**：专属电脑横屏最终冻结为自定义逻辑分辨率 **1408×881**、无刘海，UU 实际名称为“MacBook-Neo”，自动路由已完成。路由命中时，这块屏只在当前远程会话中临时成为主屏，让 Dock、已有窗口和新窗口随 macOS 进入 Neo 工作区；断开或换手时先恢复 Dell 主屏和原显示排列，再撤 Neo 屏。这个临时状态不写入 `AppConfig.mainScreen`。UU 由后台服务拉起、主界面尚无可读窗口时，UUFlow 会在后台恢复界面并展开本机被控详情，继续沿用同一套控制端表格识别；实机验收确认 Neo 屏重新进入 UURemoteServer 枚举与捕获、Dell 始终在线，退出顺序和 Dell 的 1920×1080 HiDPI、3840×2160 backing、120Hz 长期模式均正确。
+- **ThinkPad E16**：专属电脑横屏最终冻结为自定义逻辑分辨率 **1280×720**，UU 实际名称为“THINKPAD-E16”，自动路由已完成。1280×800 虽与面板 2560×1600 保持 2 倍关系，但在 ThinkPad 的 UU 实际画面区域中产生明显左右黑边，因此被实机结果淘汰。1280×720 改用 16:9 后，左右黑边基本消失，画面未见拉伸或裁切，字号仍可正常使用。
+- **Legion Y9000P**：UU 实际名称为“LEGION-Y9000P”，已显式绑定为旁路，不创建 UUFlow 虚拟屏，不改变 Mac mini 显示拓扑。
 
 ### Phase 1 完成标准
 
 1. 一加连接时只出现一加屏；
 2. iPad 连接时只出现 iPad 屏；
-3. Neo 连接时只出现 Neo 电脑屏；
+3. Neo 连接时只出现 Neo 电脑屏，且该屏在会话期间临时成为主屏；
 4. ThinkPad 连接时只出现 ThinkPad 电脑屏；
 5. Legion 连接时保持旁路；
 6. 未识别或未绑定设备保持旁路；
 7. 设备接管时旧屏撤掉、新设备对应屏按路由建立；
-8. 断开后窗口和显示器按现有 Snug 机制恢复；
+8. Neo 断开或被其他设备接管时，先恢复 Dell 主屏和原排列，再撤 Neo 屏；Dell 始终在线，长期模式保持 1920×1080 HiDPI、3840×2160 backing、120Hz；
 9. 手机、平板继续使用触控增强；电脑屏保持普通显示器行为；
-10. `mainScreen` 默认保持为空，不依赖常驻虚拟主屏实现路由。
+10. `mainScreen` 默认保持为空；Neo 的主屏行为只由当前命中的控制端规则产生，不形成常驻虚拟主屏。
 
-当前一加与 iPad 的自动路由已经在本地 feature branch `codex/controller-screen-routing-phase-0-5` 完成并通过现有检查；该分支尚未合并、未 push。Neo、ThinkPad 和 Legion 的最终路由收口后，再把本阶段整体合入主线。
+一加、iPad、MacBook Neo 与 ThinkPad 的专属屏和自动路由已经在本地 feature branch `codex/controller-screen-routing-phase-0-5` 完成，Legion 已显式旁路；Neo 的后台控制端界面恢复、会话临时主屏、断开恢复和物理屏模式保护也已纳入同一套适配与屏幕调度回归。物理屏模式以远程前持续记录的空闲基线为准，不会把远控先行切出的临时模式当成用户设置。该分支尚未合并、未 push；Phase 1 已收口，Phase 2 尚未开始。
 
 ---
 
-## Phase 2：macOS 本机 / 远端键盘模式
+## Phase 2：MacBook Neo Controller
 
 目标设备首先是 MacBook Neo。
 
-第一步只解决键盘，不做触控板。核心行为：
+第一批工作按以下顺序进行：
+
+1. Neo 专属屏出现后，Controller 自动选择 UU远程 中对应的 `MacBook Neo` 显示标签；
+2. 实现本机 / 远端输入模式；
+3. 验证并接入 Alt+Tab 路由。
+
+这一阶段先解决显示标签和键盘，不做触控板。输入模式的核心行为：
 
 - **本机模式**：快捷键继续作用于 MacBook Neo 本机；
 - **远端模式**：选定快捷键只作用于远程 Mac mini；
 - 模式切换不能让同一次按键同时作用于两端；
 - UU远程 不在前台、远程会话结束、Controller 退出或异常时，恢复安全的本机输入状态。
 
-### 第一项技术验证：Alt+Tab
+### Alt+Tab 技术验证
 
 先只验证一件事：
 
@@ -148,8 +154,8 @@ UUFlow 是 Snug 的功能扩展，不以大规模重写上游为目标。
 
 ## 当前实施顺序
 
-1. **完成 Phase 1**：一加和 iPad 已完成；补 Neo、ThinkPad 专属屏路由，并确认 Legion 旁路后收口。
-2. **Phase 2**：MacBook Neo 上实现本机 / 远端键盘模式，第一项只打通 Alt+Tab。
+1. **Phase 1 已完成**：一加、iPad、MacBook Neo 与 ThinkPad 按真实控制端名称自动路由到各自专属屏；Legion 显式旁路。
+2. **下一阶段是 Phase 2**：MacBook Neo Controller 先自动选择 Neo 显示标签，再实现本机 / 远端模式，最后接入 Alt+Tab 路由。
 3. **Phase 3**：把同一键盘模式带到 ThinkPad / Windows。
 4. **Phase 4**：MacBook Neo 三指 Space / Mission Control / App Exposé。
 5. **Phase 5**：最后评估 Windows 触控板与其他输入增强。

@@ -51,6 +51,7 @@ struct ControllerTableTests {
         let tree = Self.window(sidebar: [Self.sidebarCard], main: [Self.text("电脑"), Self.text("问剑新葡京"), Self.text("本机")],
                                overlay: Self.localPage(Self.row("iPhone", "远程控制", "连接时长 00:00:04")))
         #expect(ControllerTable(windows: [tree]) == .shown(["iPhone"]))
+        #expect(!ControllerTable.shouldRevealLocalPage(windows: [tree]))
     }
 
     @Test("同账号的另一台 Mac 被手机连着、本机没人连：UU 停在那台的设备详情页，表里的控制端不是本机的（issue #12）")
@@ -58,6 +59,7 @@ struct ControllerTableTests {
         let tree = Self.window(sidebar: [Self.text("我的设备"), Self.text("全部设备")],
                                main: [Self.otherDevicePage(Self.row("iPhone Air", "远程控制", "连接时长 00:01:10"))])
         #expect(ControllerTable(windows: [tree]) == .unrecognized)
+        #expect(!ControllerTable.shouldRevealLocalPage(windows: [tree]))
     }
 
     @Test("本机被电脑连着、底下还停着另一台被手机连着的设备详情页：只认本机的，不把那台的手机算进来")
@@ -70,8 +72,11 @@ struct ControllerTableTests {
 
     @Test("被控页收起后只剩左边栏的小卡片、没有表：未识别；没有窗口内容也是未识别")
     func collapsedPage() {
-        #expect(ControllerTable(windows: [Self.window(sidebar: [Self.sidebarCard], main: [Self.text("电脑")])]) == .unrecognized)
+        let collapsed = Self.window(sidebar: [Self.sidebarCard], main: [Self.text("电脑")])
+        #expect(ControllerTable(windows: [collapsed]) == .unrecognized)
+        #expect(ControllerTable.shouldRevealLocalPage(windows: [collapsed]))
         #expect(ControllerTable(windows: []) == .unrecognized)
+        #expect(!ControllerTable.shouldRevealLocalPage(windows: []))
     }
 
     @Test("names 只在认出时有内容；日志描述三态各不相同")

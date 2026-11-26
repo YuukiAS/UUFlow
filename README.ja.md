@@ -28,6 +28,9 @@ UU远程 のために構築 · リモート Mac の表示とタッチを強化<b
 
 > [aoyamashou/UUyc-companion](https://github.com/aoyamashou/UUyc-companion)（AoyamaShou 作の UU Remote Companion、MIT ライセンス）を引き継いだもので、元の著作権表示とコミット履歴を完全に保持しています。2.0 でスマートフォン画面を中心に再設計し、2.6 でタブレットとコンピュータに拡張しました。
 
+> [!NOTE]
+> **UUFlow fork：** 現在のビルドは、UU远程 が報告したコントローラ名がちょうど 1 つで、ユーザー規則に完全一致するときだけ、対応する仮想画面を作成します。不明、未設定、複数、またはバイパス指定の名前では UU远程 を変更しません。実際のリモート接続では、従来の常駐メインディスプレイ機能を使用しません。現在の UUFlow 手順は中国語版 README を参照してください。以下の未翻訳箇所には上流 Snug の説明が残っています。
+
 ## 📥 ダウンロード
 
 <img src="Assets/AppIcon/AppIcon-1024.png" width="88" align="left" alt="Snug アイコン">

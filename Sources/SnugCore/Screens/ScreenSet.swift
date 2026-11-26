@@ -63,10 +63,14 @@ public final class ScreenSet {
     private var retiring: Retiring?
     /// 远程在不在进行（会话层的结论，含断开后等重连的那段）：这期间别的屏可能处在远程用的临时模式
     private var remote = false
-    /// 远程中撤过屏：那时别的屏可能正处在远程用的临时模式，系统套用时连永久配置一起写了。
-    /// 远程结束（UU 已经还原）、只剩常驻的屏（设为主屏的那块）、屏都醒着时，把别的屏此刻的模式写进永久配置：
-    /// 系统按「这组屏幕」记模式，被写坏的正是留下的这一组
-    private var persistOwed = false
+    /// 远程中撤屏前，别的屏原本是什么模式。系统可能在撤屏后短暂换档，甚至让原屏暂时离线；
+    /// 远程结束后只能把这里记下的原模式写回永久配置，不能拿结束时碰巧读到的临时模式当新基线。
+    /// 同一块屏一轮远程只认最早一份，后续拓扑抖动不能覆盖用户原来的设置。
+    /// nil 表示这轮远程还没撤过屏；空字典表示第一次撤屏时没有可安全记录的物理屏，后续抖动也不能改记临时屏。
+    private var persistOwed: [DisplayID: OtherDisplay]?
+    /// 没有远程、也没有 Snug 屏时，物理屏最后一次稳定的样子。远控可能在 Snug 认出连接前先改物理屏模式；
+    /// 会话屏临时接管主屏时，以这份空闲基线恢复，不能把连入后的临时模式当作用户设置。
+    private var idleDisplays: [DisplayID: OtherDisplay] = [:]
 
     init(displays: any VirtualDisplays, windows: any WindowControl, arrangement: any DisplayArrangement, timeline: any Timeline,
          lane: SerialLane) {
@@ -151,12 +155,19 @@ public final class ScreenSet {
         // 远程结束后撤屏（UU 已经还原），撤屏前的样子就是用户自己的设置：系统套用旧模式时也写进了永久配置，
         // 只设回本次登录，磁盘上那组屏幕记的还是旧模式（实测），所以连永久配置一起写回。
         // 加屏、远程中撤屏，之前可能是远程用的临时模式：只设回本次登录，远程结束后再写永久配置
-        if !retire.isEmpty, remote { persistOwed = true }
-        let batch = Retiring(displays: gone, before: before, permanently: create.isEmpty && !remote)
+        if !retire.isEmpty, remote, persistOwed == nil {
+            persistOwed = Dictionary(uniqueKeysWithValues: before.others.map { ($0.id, $0) })
+        }
+        // 远程软件可能在 Snug 认出控制端之前，先把物理主屏拨到推流用的临时模式。会话屏要接管主屏时，
+        // 模式按连入前持续记录的空闲基线恢复；窗口位置仍按这次加屏前的真实位置善后。
+        let restoreModes = create.contains(where: \.main) ? useIdleModes(in: &before) : true
+        let batch = Retiring(displays: gone, before: before, permanently: create.isEmpty && !remote,
+                             restoreModes: restoreModes)
         let pending = retiring.map { $0.joined(batch) } ?? batch
         retiring = nil
         if offline, !pending.displays.contains(where: displays.isOnline) {
-            await settle(pending.before, after: change, permanently: pending.permanently)
+            await settle(pending.before, after: change, permanently: pending.permanently,
+                         restoreModes: pending.restoreModes)
         } else {
             retiring = pending
             Log.info("撤掉的屏还没下线（显示器睡着时要等唤醒），下线后再放回窗口、设回别的屏")
@@ -218,13 +229,16 @@ public final class ScreenSet {
         var displays: [DisplayID]
         var before: Surroundings
         var permanently: Bool
+        var restoreModes: Bool
 
         /// 上一批还没下线又撤了一批：一起等，都下线了按第一批之前的样子放回（屏没下线前系统不挪窗口，显示器睡着时也没人动）；
         /// 后一批撤掉的屏上的窗口不在后一份里，交给系统
         func joined(_ later: Retiring) -> Retiring {
             var before = before
             before.windows = before.windows.filter { later.before.windows[$0.key] != nil }
-            return Retiring(displays: displays + later.displays, before: before, permanently: permanently && later.permanently)
+            return Retiring(displays: displays + later.displays, before: before,
+                            permanently: permanently && later.permanently,
+                            restoreModes: restoreModes && later.restoreModes)
         }
     }
 
@@ -236,12 +250,31 @@ public final class ScreenSet {
         return Surroundings(windows: await windows.snapshot(), others: others, snug: snug)
     }
 
+    /// 把加屏前读到的远控临时模式换成最后一次空闲基线；位置仍保留加屏前的真实值，供窗口善后。
+    /// 显示编号重排时只在名称唯一时接续；本轮新接入、没有基线的屏保持现状，不猜。
+    private func useIdleModes(in before: inout Surroundings) -> Bool {
+        guard !idleDisplays.isEmpty else { return false }
+        var matched = false
+        before.others = before.others.map { current in
+            let sameName = current.name.isEmpty ? [] : idleDisplays.values.filter { $0.name == current.name }
+            guard let idle = idleDisplays[current.id] ?? (sameName.count == 1 ? sameName[0] : nil) else { return current }
+            matched = true
+            var restored = current
+            restored.mode = idle.mode
+            return restored
+        }
+        return matched
+    }
+
     /// 屏幕组合换完（新屏上线、旧屏下线）后放回：先设回被拨动的屏（模式连分辨率一起变时会再挪窗口），
     /// 等系统挪完，再放回被挪动的窗口。这期间拔掉、新接上的屏不碰
-    private func settle(_ before: Surroundings, after change: String, permanently: Bool) async {
+    private func settle(_ before: Surroundings, after change: String, permanently: Bool,
+                        restoreModes: Bool = true) async {
         await timeline.sleep(Self.topologySettle)
         let now = Dictionary(displays.otherDisplays().map { ($0.id, $0.mode) }, uniquingKeysWith: { first, _ in first })
-        let drifted = before.others.compactMap { was in now[was.id].flatMap { $0.isSame(as: was.mode) ? nil : (was, $0) } }
+        let drifted = restoreModes ? before.others.compactMap { was in
+            now[was.id].flatMap { $0.isSame(as: was.mode) ? nil : (was, $0) }
+        } : []
         if !drifted.isEmpty {
             let detail = drifted.map { was, now in "\(was.name) \(was.mode) → \(now)" }.joined(separator: "、")
             Log.info("\(change)时 macOS 把别的屏拨成了它给这组屏幕记的模式（\(detail)），设回\(change)前的样子")
@@ -274,30 +307,48 @@ public final class ScreenSet {
 
     /// 远程在不在进行（会话层的结论）。远程结束后，远程中撤屏留下的永久配置要重写（settleDisplays）
     func setRemote(_ on: Bool) -> Bool {
+        if !on, live.isEmpty {
+            let current = displays.otherDisplays()
+            if !current.isEmpty {
+                idleDisplays = Dictionary(current.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
+            }
+        }
         guard on != remote else { return false }
         remote = on
+        if !on, persistOwed?.isEmpty == true { persistOwed = nil }
         return true
     }
 
     var isRemote: Bool { remote }
 
     /// 有没有善后要做：撤掉的屏还没下线，或远程中撤过屏、永久配置要重写
-    var owesSettling: Bool { retiring != nil || persistOwed }
+    var owesSettling: Bool { retiring != nil || persistOwed.map { !$0.isEmpty } == true }
 
-    /// 撤掉的屏真下线了，就放回窗口、设回别的屏；远程中撤过屏的，远程结束、屏都醒着时把别的屏此刻的模式写进永久配置
+    /// 撤掉的屏真下线了，就放回窗口、设回别的屏；远程中撤过屏的，远程结束后把撤屏前记下的原模式写回永久配置
     func settleDisplays() async {
         if let r = retiring {
             guard !r.displays.contains(where: displays.isOnline) else { return }
             retiring = nil
             Log.info("撤掉的屏 \(r.displays.map { "#\($0)" }.joined(separator: "、")) 下线了")
-            await settle(r.before, after: "撤屏", permanently: r.permanently)
+            await settle(r.before, after: "撤屏", permanently: r.permanently,
+                         restoreModes: r.restoreModes)
         }
-        guard persistOwed, !remote, live.keys.allSatisfy(isResident) else { return }
+        guard var owed = persistOwed, !owed.isEmpty, !remote, live.keys.allSatisfy(isResident) else { return }
         let others = displays.otherDisplays()
-        guard !others.contains(where: \.asleep) else { return }
-        persistOwed = false
-        Log.info("远程中撤过屏，远程结束后把别的屏此刻的模式写进永久配置：\(others.map { "\($0.name) \($0.mode)" }.joined(separator: "、"))")
-        for other in others { await displays.setMode(other.id, other.mode, permanently: true) }
+        var ready: [(owedID: DisplayID, currentID: DisplayID, original: OtherDisplay)] = []
+        for (id, original) in owed.sorted(by: { $0.key < $1.key }) {
+            let sameID = others.first { $0.id == id }
+            let sameName = original.name.isEmpty ? [] : others.filter { $0.name == original.name }
+            guard let current = sameID ?? (sameName.count == 1 ? sameName[0] : nil), !current.asleep else { continue }
+            ready.append((id, current.id, original))
+        }
+        guard !ready.isEmpty else { return }
+        Log.info("远程中撤过屏，远程结束后把撤屏前记下的模式写回永久配置：\(ready.map { "\($0.original.name) \($0.original.mode)" }.joined(separator: "、"))")
+        for item in ready {
+            await displays.setMode(item.currentID, item.original.mode, permanently: true)
+            owed[item.owedID] = nil
+        }
+        persistOwed = owed.isEmpty ? nil : owed
     }
 
     // MARK: 主屏

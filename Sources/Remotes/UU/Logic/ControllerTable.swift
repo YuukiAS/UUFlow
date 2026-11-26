@@ -39,7 +39,7 @@ package enum ControllerTable: Equatable, Sendable, CustomStringConvertible {
     case shown([String])
 
     /// 本机被控页的标题
-    static let pageTitle = "本机被控中"
+    package static let pageTitle = "本机被控中"
     /// 控制端行带的连接方式。只认「远程控制」，远程协助、副屏模式的行不算
     static let controlMark = "远程控制"
     /// 控制端行里的连接时长，比如「连接时长 00:10」，不是名字
@@ -48,6 +48,12 @@ package enum ControllerTable: Equatable, Sendable, CustomStringConvertible {
     /// windows：UU 每个窗口的界面树
     package init(windows: [UUElement]) {
         self.init(rows: windows.flatMap(Self.localTables).flatMap(\.rows).map(\.texts))
+    }
+
+    /// 远程已经发生、左侧有「本机被控中」卡片，但详情表格收着：系统层可以只点开这张本机卡片，再沿用同一套表格识别。
+    package static func shouldRevealLocalPage(windows: [UUElement]) -> Bool {
+        guard ControllerTable(windows: windows) == .unrecognized else { return false }
+        return windows.contains { $0.contains(text: pageTitle) }
     }
 
     /// 和「本机被控中」标题直接挂在同一个元素下的表格
@@ -88,5 +94,10 @@ private extension UUElement {
     var texts: [String] {
         let own: [String] = if case .text(let text) = kind { [text] } else { [] }
         return own + children.flatMap(\.texts)
+    }
+
+    func contains(text wanted: String) -> Bool {
+        if kind == .text(wanted) { return true }
+        return children.contains { $0.contains(text: wanted) }
     }
 }

@@ -58,7 +58,7 @@ final class AppState {
         PanelState(desk: desks.desks[id] ?? Desk.State(), quitting: desks.quitting, closing: desks.closing)
     }
 
-    /// Snug 的屏有没有人在用：远程中（含等重连），或预览自测。常驻的主屏没人远程时也在，这时面板不为它干活
+    /// Snug 的屏有没有人在用：远程中（含等重连），或预览自测
     var screensInUse: Bool { connection != .idle || previewing }
 
     /// 这块显示器是哪块 Snug 屏；不是 Snug 的屏（内建屏、外接显示器）返回 nil
@@ -70,7 +70,7 @@ final class AppState {
     var watchedScreen: ScreenID? { streamedDisplay.flatMap { screenID(on: $0) } }
 
     /// 手机（控制端）此刻在看这块屏，资源库才为它刷。不知道远控在推哪块屏（UU 是推流日志没读到）时当作在看；
-    /// 没人远程时谁都没在看（常驻的主屏）
+    /// 没人远程时谁都没在看
     func watching(_ id: ScreenID) -> Bool { screensInUse && (streamedDisplay == nil || watchedScreen == id) }
 
     /// 菜单栏「App 资源库」能往哪些屏放：就绪的电脑屏，按屏幕列表的顺序。手机、平板屏有自己的面板，
@@ -111,10 +111,12 @@ protocol AppIntents: AnyObject, Sendable {
     func setScreenEnabled(_ id: ScreenID, _ on: Bool)
     func addScreen(orientation: Orientation, device: DeviceChoice, name: String)
     func removeScreen(_ id: ScreenID)
+    /// UU 实际读到的控制端名称绑定到一块屏；nil 表示旁路
+    func bindController(_ name: String, to screen: ScreenID?)
     /// 换型号：屏在就马上换成它的比例
     func setScreenDevice(_ id: ScreenID, _ device: DeviceChoice)
     func renameScreen(_ id: ScreenID, _ name: String)
-    /// 设为主屏的那块（常驻）；nil 不改主屏
+    /// 设为主屏的旧配置；真实远程中停用，只保留清理旧设置和预览用途
     func setMainScreen(_ id: ScreenID?)
     func setGestures(_ on: Bool)
     func setZoomSteps(_ steps: Int)

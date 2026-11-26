@@ -21,6 +21,13 @@ enum UUAccessibility {
         return try? wins.compactMap { try snapshot($0, walk: &walk) }
     }
 
+    /// 只在快照已经确认左侧存在「本机被控中」卡片、详情表格却没展开时调用。
+    /// 点精确标题或离它最近、支持 AXPress 的容器；不按设备名、不碰其他设备详情。
+    static func revealLocalControllerPage(pid: pid_t) -> Bool {
+        var walk = RevealWalk()
+        return windowElements(pid: pid).contains { reveal(in: $0, ancestors: [], walk: &walk) }
+    }
+
     // MARK: AX 基础（薄封装在 SnugSystem 的 AX）
 
     private static func role(_ el: AXUIElement) -> String? { AX.string(el, kAXRoleAttribute) }
@@ -49,6 +56,30 @@ enum UUAccessibility {
         /// 从窗口到当前元素的这一串：再碰到其中一个就是环
         var path = Set<AXUIElement>()
         var count = 0
+    }
+
+    private struct RevealWalk {
+        var path = Set<AXUIElement>()
+        var count = 0
+    }
+
+    private static func reveal(in node: AXUIElement, ancestors: [AXUIElement], walk: inout RevealWalk) -> Bool {
+        guard !walk.path.contains(node), ancestors.count < maxDepth, walk.count < maxNodes else { return false }
+        walk.count += 1
+        walk.path.insert(node)
+        defer { walk.path.remove(node) }
+
+        if role(node) == kAXStaticTextRole, value(node) == ControllerTable.pageTitle {
+            for target in [node] + ancestors.reversed().prefix(4) where press(target) { return true }
+        }
+        return AX.children(node).contains { reveal(in: $0, ancestors: ancestors + [node], walk: &walk) }
+    }
+
+    private static func press(_ element: AXUIElement) -> Bool {
+        var raw: CFArray?
+        guard AXUIElementCopyActionNames(element, &raw) == .success,
+              let actions = raw as? [String], actions.contains(kAXPressAction) else { return false }
+        return AXUIElementPerformAction(element, kAXPressAction as CFString) == .success
     }
 
     /// 先序抄下来。只跳过环，不按对象去重：同一个元素挂在两个父元素下就两处都抄，

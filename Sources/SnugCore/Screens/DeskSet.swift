@@ -569,7 +569,7 @@ public final class DeskSet {
     }
 
     /// 定期调用、屏幕配置一变也调用：撤屏后屏真下线了，就放回窗口、设回别的屏；远程中撤过屏的，
-    /// 远程结束、屏都醒着时把别的屏此刻的模式写进永久配置。没事可做时什么都不做
+    /// 远程结束、原屏在线且醒着时把撤屏前记下的模式写回永久配置。没事可做时什么都不做
     public func settleDisplays() {
         guard screens.owesSettling else { return }
         lane.runCoalesced("settle") { await self.screens.settleDisplays() }

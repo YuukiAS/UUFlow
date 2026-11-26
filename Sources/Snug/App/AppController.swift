@@ -34,6 +34,8 @@ final class AppController: Sendable {
     private var tickTimer: Timer?
     private var lastTickAt: Date?
     private var lastVerifyAt = Date.distantPast
+    /// 控制端或策略结果变了才记一行，避免每 0.5 秒刷日志
+    private var lastPlanSummary: String?
     /// 手势翻译此刻覆盖哪几块屏：变了才记日志
     private var gestureScreens: Set<ScreenID> = []
     /// 单调时钟的起点：系统改时间不会让「已经过了多久」算错
@@ -156,14 +158,14 @@ final class AppController: Sendable {
     /// 会话变化统一在这里落地（每拍和菜单的「立即结束」共用）
     private func handle(_ transitions: [SessionTransition]) {
         if transitions.contains(.ended) {
-            // 远程结束先说一声一块屏都不要，再按「不在远程」重算（只剩常驻的主屏）。不先说「不要」的话，下一次在同一拍里
+            // 远程结束先说一声一块屏都不要，再按「不在远程」重算。不先说「不要」的话，下一次在同一拍里
             // 开始时前后要的屏一样，上一次在手机上退出的屏会带进这一次。同一拍里先「不要」再「要」不会撤屏重建（DeskSet 排队时读的是最新结论）
             desks.setWishes([])
         }
         applyPlan()
         desks.setRemote(session.inEpisode)
         state.update(\.connection, session.isConnected ? .connected : (session.inEpisode ? .reconnecting : .idle))
-        state.update(\.controllers, session.controllers)
+        state.update(\.controllers, session.observedControllers)
         state.update(\.remoteName, session.owner?.displayName)
     }
 
@@ -188,7 +190,17 @@ final class AppController: Sendable {
 
     /// 按此刻的配置和会话算出要哪些屏，交给 DeskSet（结论没变就什么都不做）
     func applyPlan() {
-        desks.setWishes(ScreenPlan.wishes(config: store.config, remote: session.inEpisode, trusted: state.accessibilityTrusted, preview: preview))
+        let controllers = session.observedControllers
+        let wishes = ScreenPlan.wishes(config: store.config, remote: session.inEpisode, controllers: controllers,
+                                       trusted: state.accessibilityTrusted, preview: preview)
+        let names = controllers.isEmpty ? "未识别" : controllers.joined(separator: "、")
+        let result = wishes.isEmpty ? "旁路（0 块屏）" : wishes.compactMap { wish in store.config.screens.first { $0.id == wish.id }?.name }.joined(separator: "、")
+        let summary = "\(session.inEpisode)|\(state.accessibilityTrusted)|\(preview)|\(names)|\(result)"
+        if summary != lastPlanSummary {
+            lastPlanSummary = summary
+            Log.info("屏幕策略：控制端 \(names) → \(result)")
+        }
+        desks.setWishes(wishes)
     }
 
     /// 权限是用户在系统设置里给的，随时会变：刚给上时把上次没放回去的窗口放回去

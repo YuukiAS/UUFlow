@@ -51,6 +51,10 @@ final class ControllerReader {
                 Log.warn(String(format: "读 UU 控制端表格用了 %.1fs，结果丢弃", took))
             }
             let table = tooSlow ? .unreadable : windows.map(ControllerTable.init(windows:)) ?? .unreadable
+            if !tooSlow, let windows, ControllerTable.shouldRevealLocalPage(windows: windows),
+               UUAccessibility.revealLocalControllerPage(pid: pid) {
+                Log.info("UU 本机被控详情收着，已在后台展开控制端表格")
+            }
             box.withLock { b in
                 guard b.generation == generation else { return }
                 b.inFlightSince = nil

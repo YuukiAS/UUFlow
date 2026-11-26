@@ -6,7 +6,7 @@ public struct AppConfig: Codable, Equatable, Sendable {
     public var screens = [ScreenConfig.legacyPhone(.standard, enabled: true)]
     /// 控制端名称 → 屏幕；screen 为 nil 表示显式旁路。没有规则的名称也旁路
     public var controllerBindings: [ControllerBinding] = []
-    /// 旧版设为主屏配置；Phase 0.5 真实远程中停用，只供旧配置清理和显式预览使用。nil 表示不改主屏（默认）
+    /// 旧版设为主屏配置；真实远程中停用，只供旧配置清理和显式预览使用。nil 表示不改主屏（默认）
     public var mainScreen: ScreenID?
     /// 下一块新加的屏至少用哪一段序列号（只增不减：删掉的屏的号也不回收，免得系统把旧屏的记忆套到新屏上）
     public var nextSerialBlock = 0

@@ -116,7 +116,7 @@ protocol AppIntents: AnyObject, Sendable {
     /// 换型号：屏在就马上换成它的比例
     func setScreenDevice(_ id: ScreenID, _ device: DeviceChoice)
     func renameScreen(_ id: ScreenID, _ name: String)
-    /// 设为主屏的旧配置；Phase 0.5 真实远程中停用，只保留清理旧设置和预览用途
+    /// 设为主屏的旧配置；真实远程中停用，只保留清理旧设置和预览用途
     func setMainScreen(_ id: ScreenID?)
     func setGestures(_ on: Bool)
     func setZoomSteps(_ steps: Int)

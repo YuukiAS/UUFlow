@@ -1,5 +1,4 @@
-// update.json：最新的发布。发布时由 snug-release 写（scripts/snug ship 传到 GitHub 和国内源），
-// App 每次启动取一次：版本号决定有没有新版本，更新日志给用户看落下了什么，清单（UpdatePackage）照着拼新版本
+// 旧 update.json 的纯数据格式。UUFlow App runtime 不读取网络 feed；保留这一层供本地包格式测试与未来发布设计复用。
 import Foundation
 
 public struct UpdateFeed: Codable, Equatable, Sendable {
@@ -59,13 +58,13 @@ public struct ReleaseNote: Codable, Equatable, Sendable {
         self.body = body
     }
 
-    /// 标签说明 → 更新日志。第一行去掉开头的「Snug 2.0.1：」当标题；
+    /// 标签说明 → 更新日志。第一行去掉开头的「UUFlow 2.0.1：」当标题；
     /// 「安装」一节（下载 dmg、拖进「应用程序」）是写给 GitHub 上手动下载的人的，App 里更新用不着，去掉
     public init(version: Version, date: String, tagMessage: String) {
         var lines = tagMessage.split(separator: "\n", omittingEmptySubsequences: false)
             .map { $0.trimmingCharacters(in: .whitespaces) }
         let first = lines.isEmpty ? "" : lines.removeFirst()
-        let prefix = "Snug \(version)："
+        let prefix = "UUFlow \(version)："
         let title = first.hasPrefix(prefix) ? String(first.dropFirst(prefix.count)) : first
         var body: [String] = []
         var skipping = false

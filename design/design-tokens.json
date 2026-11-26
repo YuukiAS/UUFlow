@@ -101,9 +101,7 @@
       "screenshot":     { "ref": "palette.pink",   "symbol": "camera.viewfinder" },
       "launchAtLogin":  { "ref": "palette.gray",   "symbol": "power" },
       "accessibility":  { "ref": "palette.indigo", "symbol": "hand.raised.fill" },
-      "screenRecording":{ "ref": "palette.red",    "symbol": "record.circle" },
-      "update":         { "ref": "palette.blue",   "symbol": "arrow.down" },
-      "updateSource":   { "ref": "palette.gray",   "symbol": "server.rack" }
+      "screenRecording":{ "ref": "palette.red",    "symbol": "record.circle" }
     },
     "status": {
       "about": "远程状态块的颜色：只有这四种",

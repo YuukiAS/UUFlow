@@ -1,8 +1,8 @@
-.build/
+.build
 .swiftpm/
 *.app
 .DS_Store
-build/
+build
 dist/
 
 # Claude Code 本机设置（里面的自动记忆目录是本机绝对路径）
@@ -14,7 +14,7 @@ dist/
 # Playwright MCP 的截图与页面快照（浏览器预览时生成）
 .playwright-mcp/
 
-# scripts/snug 传国内源用的 Python 环境（依赖见 scripts/cos-requirements.txt）
+# 本机 Python 隔离环境（当前 scripts/uuflow 不需要额外依赖）
 .venv/
 
 # 演示录制的工作区（原始录像、抽帧分析、录制脚本、内容生产说明），只留本机，绝不提交

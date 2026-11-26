@@ -1,0 +1,283 @@
+#!/bin/zsh
+# UUFlow 的开发、安装与本地分发入口。Swift target 仍叫 Snug，仅属于内部构建兼容名。
+set -euo pipefail
+cd "${0:A:h}/.."
+
+readonly BUNDLE_ID="com.zephyr4123.snug"
+readonly APP="build/UUFlow.app"
+readonly ARCHS=(--arch arm64 --arch x86_64)
+
+die() { print -u2 -- "❌ $*"; exit 1; }
+warn() { print -u2 -- "⚠️  $*"; }
+step() { print -- "==> $*"; }
+
+usage() {
+  cat <<'USAGE'
+用法：scripts/uuflow <命令>
+
+  check         检查远控适配边界，构建全部产物，运行全部 Swift 与 Python 测试
+  app           构建并签名 build/UUFlow.app
+  install       安全迁移到 /Applications/UUFlow.app 并打开；成功后退役旧 Snug.app
+  dist          构建本地可分发的 UUFlow DMG（需要 Developer ID 与公证配置）
+  remote-check  远控兼容自检：scripts/uuflow remote-check uu [小时]
+  help          显示帮助
+USAGE
+}
+
+load_machine_env() {
+  [[ -f .machine.env ]] || return 0
+  local key value
+  while IFS='=' read -r key value; do
+    [[ $key =~ '^[A-Z_][A-Z0-9_]*$' ]] || continue
+    value="${value%\"}"; value="${value#\"}"
+    [[ $value == "~/"* ]] && value="$HOME/${value#\~/}"
+    [[ -n ${(P)key:-} || -z $value ]] || export "$key=$value"
+  done < .machine.env
+}
+
+prepare_build_storage() {
+  [[ -n ${UUFLOW_BUILD_ROOT:-} ]] || return 0
+  local root="${UUFLOW_BUILD_ROOT:A}"
+  [[ $root != "$PWD" && $root != "$PWD/"* ]] || die "UUFLOW_BUILD_ROOT 不能放在源码目录里"
+  mkdir -p "$root"
+
+  local name target linked
+  for name in .build build; do
+    target="$root/$name"
+    if [[ -L $name ]]; then
+      linked="$(readlink "$name")"
+      [[ $linked == "$target" ]] || die "$name 已指向别处：$linked"
+      mkdir -p "$target"
+    elif [[ -e $name ]]; then
+      [[ ! -e $target ]] || die "$target 已存在，不能自动合并构建缓存"
+      mv "$name" "$target"
+      ln -s "$target" "$name"
+    else
+      mkdir -p "$target"
+      ln -s "$target" "$name"
+    fi
+  done
+}
+
+read_version() {
+  local version; version="$(tr -d '[:space:]' < VERSION)"
+  [[ $version =~ '^[0-9]+\.[0-9]+\.[0-9]+$' ]] || die "VERSION 里的版本号不合法：「$version」"
+  print -- "$version"
+}
+
+IDENTITY=""
+DEVELOPER_ID=0
+
+resolve_identity() {
+  local all; all="$(security find-identity -v -p codesigning 2>/dev/null || true)"
+  if [[ -n ${MAC_SIGNING_IDENTITY:-} ]]; then
+    if [[ $MAC_SIGNING_IDENTITY == "-" ]]; then IDENTITY=""
+    else
+      [[ $all == *"$MAC_SIGNING_IDENTITY"* ]] || die "钥匙串里找不到 MAC_SIGNING_IDENTITY 指定的有效证书"
+      IDENTITY="$MAC_SIGNING_IDENTITY"
+    fi
+  else
+    local found=("${(@f)$(print -r -- "$all" | awk '/"Developer ID Application: /{print $2}')}" )
+    found=(${found:#})
+    case ${#found} in
+      0) IDENTITY="" ;;
+      1) IDENTITY="${found[1]}" ;;
+      *) die "钥匙串里有 ${#found} 张 Developer ID Application 证书，请在 .machine.env 指定 MAC_SIGNING_IDENTITY" ;;
+    esac
+  fi
+  if [[ -n $IDENTITY && $all == *"$IDENTITY"*'"Developer ID Application: '* ]]; then DEVELOPER_ID=1; fi
+}
+
+describe_identity() { [[ -z $IDENTITY ]] && print -- "ad-hoc" || print -- "Developer ID（${IDENTITY[1,8]}…）"; }
+
+sign() {
+  local target=$1 flags=(--force --sign "${IDENTITY:--}")
+  (( DEVELOPER_ID )) && flags+=(--timestamp)
+  [[ -d $target ]] && { flags+=(--identifier "$BUNDLE_ID"); (( DEVELOPER_ID )) && flags+=(--options runtime); }
+  codesign "${flags[@]}" "$target"
+}
+
+write_info_plist() {
+  local version=$1
+  cat <<PLIST
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0"><dict>
+  <key>CFBundleIdentifier</key><string>${BUNDLE_ID}</string>
+  <key>CFBundleName</key><string>UUFlow</string>
+  <key>CFBundleDisplayName</key><string>UUFlow</string>
+  <key>CFBundleExecutable</key><string>UUFlow</string>
+  <key>CFBundleIconFile</key><string>AppIcon</string>
+  <key>CFBundlePackageType</key><string>APPL</string>
+  <key>CFBundleShortVersionString</key><string>${version}</string>
+  <key>CFBundleVersion</key><string>${version}</string>
+  <key>CFBundleDevelopmentRegion</key><string>zh_CN</string>
+  <key>CFBundleLocalizations</key><array><string>zh-Hans</string></array>
+  <key>LSMinimumSystemVersion</key><string>14.0</string>
+  <key>LSUIElement</key><true/>
+  <key>NSHighResolutionCapable</key><true/>
+  <key>NSHumanReadableCopyright</key><string>© 2026 AoyamaShou, © 2026 zephyr4123 · MIT</string>
+</dict></plist>
+PLIST
+}
+
+build_app() {
+  local version; version="$(read_version)"
+  step "编译（release，arm64 + x86_64）"
+  swift build -c release --product Snug "${ARCHS[@]}"
+  local bin; bin="$(swift build -c release "${ARCHS[@]}" --show-bin-path)"
+  step "组装 $APP（版本 $version）"
+  rm -rf "$APP"
+  mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
+  cp "$bin/Snug" "$APP/Contents/MacOS/UUFlow"
+  cp -R "$bin/PermissionFlow_PermissionFlow.bundle" "$APP/Contents/Resources/"
+  cp Assets/AppIcon/AppIcon.icns "$APP/Contents/Resources/"
+  cp Assets/device-models.json "$APP/Contents/Resources/"
+  write_info_plist "$version" > "$APP/Contents/Info.plist"
+  step "签名：$(describe_identity)"
+  sign "$APP"
+  codesign --verify --strict --deep "$APP" || die "签名校验没过：$APP"
+  (( DEVELOPER_ID )) || warn "ad-hoc 签名可能要求重新确认辅助功能权限"
+}
+
+check_remote_boundaries() {
+  local registry=Sources/Snug/App/Remotes.swift drivers=Tests/RemoteContractTests/RemoteDriver.swift
+  local import_stmt='^[[:space:]]*(@[[:alnum:]_]+(\([^)]*\))?[[:space:]]+)*((public|package|internal|private|fileprivate)[[:space:]]+)?import[[:space:]]+((typealias|struct|class|enum|protocol|let|var|func)[[:space:]]+)?'
+  # UUFlow 是产品名，不是 UU 适配器类型；另外放过 UUID 与 Cursor 的 ToDesktop bundle。
+  local allowed='UUFlow|uuflow|UUID|uuid|com[.]todesktop[.]'
+  local manifest line kind name tpath deps
+  manifest="$(swift package dump-package)" || die "SwiftPM 读不了 Package.swift"
+  local -A path_of deps_of
+  local -a declared actual
+  for line in ${(f)"$(print -r -- "$manifest" | python3 -I -c '
+import json, sys
+for t in json.load(sys.stdin)["targets"]:
+    deps = [next(iter(d.values()))[0] for d in t["dependencies"]]
+    path = t.get("path") or ("Tests/" if t["type"] == "test" else "Sources/") + t["name"]
+    print(t["type"], t["name"], path, ",".join(deps) or "-")
+')"}; do
+    read -r kind name tpath deps <<< "$line"
+    path_of[$name]=$tpath; deps_of[$name]=$deps
+    [[ $kind == test ]] && declared+=("$tpath")
+  done
+  local -a core=(${path_of[SnugCore]} ${path_of[SnugSystem]} ${path_of[SnugCoreTests]})
+  local -a outside=($core ${path_of[Snug]})
+  (( ${#core} == 3 && ${#outside} == 4 )) || die "Package.swift 里找不到 SnugCore、SnugSystem、SnugCoreTests、Snug 之一"
+  local hits
+  scan() { grep "$@" || (( $? == 1 )) || die "边界检查的 grep 出错：grep $*"; }
+  local -a families=(Sources/Remotes/*(/N:t)); local family
+  for family in $families; do [[ $family =~ '^[A-Za-z]+$' ]] || die "适配器目录名只用英文字母：$family"; done
+  if (( ${#families} )); then
+    hits="$(scan -rHniE "${(j:|:)families}" $core | awk -v names="${(Lj:|:)families}" -v allowed="$allowed" '{ s=$0; sub(/^[^:]+:[0-9]+:/,"",s); if(s~/^[[:space:]]*\/\//)next; gsub(allowed,"",s); if(tolower(s)~names)print }')"
+    [[ -z $hits ]] || die "核心层出现远控名字：\n$hits"
+  fi
+  hits="$(scan -rHnE "${import_stmt}Remote[A-Z]" $outside | scan -v "^$registry:")"
+  [[ -z $hits ]] || die "只有 $registry 能 import 适配器：\n$hits"
+  hits="$(scan -rHnE "$import_stmt" Sources/Remotes/*/Logic(N) /dev/null | scan -vE "^[^:]+:[0-9]+:${import_stmt#^}(Foundation|SnugCore)(\.[[:alnum:]_.]+)?[[:space:]]*(//.*)?\$")"
+  [[ -z $hits ]] || die "适配器 Logic 只能 import Foundation 和 SnugCore：\n$hits"
+  actual=(Tests/*(/N) Tests/Remotes/*(/N)); declared=(${(o)declared}); actual=(${(o)${actual:#Tests/Remotes}})
+  [[ "${(j: :)declared}" == "${(j: :)actual}" ]] || die "测试目标与 Tests 目录不一致"
+  local live_registry="$(sed -E 's#//.*##' $registry)" live_drivers="$(sed -E 's#//.*##' $drivers)"
+  for family in $families; do
+    local dir=Sources/Remotes/$family
+    [[ ${path_of[Remote$family]-} == "$dir/Logic" && ${path_of[Remote${family}System]-} == "$dir/System" && ${path_of[Remote${family}Tests]-} == "Tests/Remotes/$family" ]] || die "Remote$family 目标不完整"
+    [[ ${deps_of[Remote$family]} == SnugCore ]] || die "Remote$family Logic 只能依赖 SnugCore"
+    [[ ",${deps_of[RemoteContractTests]-}," == *",Remote$family,"* ]] || die "契约测试没依赖 Remote$family"
+    print -r -- "$live_registry" | grep -qE "${import_stmt}Remote${family}System[[:space:]]*(//.*)?\$" && print -r -- "$live_registry" | grep -q "${family}RemoteAdapter\.self" || die "Remote$family 未登记"
+    [[ -f Tests/RemoteContractTests/Drivers/${family}Driver.swift ]] && print -r -- "$live_drivers" | grep -q "${family}Driver()" || die "Remote$family 缺契约驱动"
+  done
+}
+
+cmd_check() {
+  step "远控适配层边界"; check_remote_boundaries
+  step "swift build（全部产物）"; swift build
+  step "swift test"; swift test
+  step "scripts 的 Python 单测"; python3 -B -m unittest discover -s scripts -p 'test_*.py'
+  print -- "✅ check 通过"
+}
+
+cmd_app() { resolve_identity; build_app; print -- "✅ $APP（$(describe_identity)）"; }
+
+stop_installed_apps() {
+  local pids=()
+  pids+=(${(f)"$(pgrep -f '^/Applications/UUFlow.app/Contents/MacOS/UUFlow' || true)"})
+  pids+=(${(f)"$(pgrep -f '^/Applications/Snug.app/Contents/MacOS/Snug' || true)"})
+  pids=(${pids:#})
+  (( ${#pids} )) || return 0
+  step "让正在运行的 App 完成窗口、主屏和虚拟屏收尾（pid ${pids[*]}）"
+  kill -TERM "${pids[@]}"
+  local waited=0
+  while kill -0 "${pids[@]}" 2>/dev/null; do
+    (( waited < 40 )) || die "App 20 秒内没退出，安装尚未改变"
+    sleep 0.5; (( waited += 1 ))
+  done
+}
+
+cmd_install() {
+  resolve_identity; build_app
+  stop_installed_apps
+  source scripts/install_transaction.zsh
+  uuflow_prepare_install "$APP" /Applications || die "候选 App 校验或安装准备失败；旧 App 未删除"
+  if ! open /Applications/UUFlow.app; then uuflow_rollback_install; die "新 App 未能打开，已回滚"; fi
+  local waited=0 pid=""
+  while (( waited < 40 )); do
+    pid="$(pgrep -f '^/Applications/UUFlow.app/Contents/MacOS/UUFlow' | head -n 1 || true)"
+    [[ -n $pid ]] && break
+    sleep 0.25; (( waited += 1 ))
+  done
+  if [[ -z $pid ]]; then
+    uuflow_rollback_install
+    [[ -d /Applications/Snug.app ]] && open /Applications/Snug.app || [[ -d /Applications/UUFlow.app ]] && open /Applications/UUFlow.app
+    die "新 App 未稳定启动，已回滚并保留旧 App"
+  fi
+  uuflow_commit_install || { kill -TERM "$pid" 2>/dev/null || true; uuflow_rollback_install; die "安装提交失败，已回滚"; }
+  print -- "✅ 已安装并打开 /Applications/UUFlow.app（$(describe_identity)），旧 Snug.app 已安全退役"
+}
+
+require_distribution_setup() {
+  (( DEVELOPER_ID )) || die "dist 需要 Developer ID Application 证书"
+  [[ -n ${MAC_NOTARY_PROFILE:-} ]] || die "dist 需要 .machine.env 中的 MAC_NOTARY_PROFILE"
+}
+
+notarize() {
+  local file=$1 out verdict
+  out="$(xcrun notarytool submit "$file" --keychain-profile "$MAC_NOTARY_PROFILE" --wait --output-format json)"
+  verdict="$(print -r -- "$out" | plutil -extract status raw -o - -)"
+  [[ $verdict == Accepted ]] || die "${file:t} 公证未通过：$verdict"
+}
+
+make_dmg() {
+  local dmg=$1 stage; stage="$(mktemp -d)"
+  ditto "$APP" "$stage/UUFlow.app"; ln -s /Applications "$stage/Applications"
+  hdiutil create -quiet -volname UUFlow -srcfolder "$stage" -format ULMO -ov "$dmg"
+  rm -rf "$stage"
+}
+
+cmd_dist() {
+  resolve_identity; require_distribution_setup
+  local version; version="$(read_version)"; local out="dist/$version" dmg="dist/$version/UUFlow-$version.dmg"
+  mkdir -p "$out"; build_app
+  local zip="$out/UUFlow-$version-notarize.zip"
+  ditto -c -k --keepParent "$APP" "$zip"; notarize "$zip"; rm -f "$zip"
+  xcrun stapler staple -q "$APP"; make_dmg "$dmg"; sign "$dmg"; notarize "$dmg"; xcrun stapler staple -q "$dmg"
+  (cd "$out" && shasum -a 256 "${dmg:t}" > "${dmg:t}.sha256")
+  print -- "✅ $dmg"
+}
+
+cmd_remote_check() {
+  [[ -n "$1" ]] || die "要写远控名字：scripts/uuflow remote-check uu [小时]"
+  swift build --product Snug
+  "$(swift build --show-bin-path)/Snug" --check-remote "$1" ${2:+"$2"}
+}
+
+load_machine_env
+prepare_build_storage
+case "${1:-help}" in
+  check) cmd_check ;;
+  app) cmd_app ;;
+  install) cmd_install ;;
+  dist) cmd_dist ;;
+  remote-check) cmd_remote_check "${2:-}" "${3:-}" ;;
+  help|-h|--help) usage ;;
+  *) usage >&2; die "不认识的命令：$1" ;;
+esac

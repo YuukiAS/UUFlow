@@ -1,4 +1,4 @@
-// UU远程 兼容自检（scripts/snug remote-check uu → Snug --check-remote uu）：UU 一更新，把 Snug 依赖它的几处逐项核对，出一份报告。
+// UU远程 兼容自检（scripts/uuflow remote-check uu → UUFlow --check-remote uu）：UU 一更新，把 UUFlow 依赖它的几处逐项核对，出一份报告。
 // 这里只做判定，事实由系统部分（RemoteUUSystem 的 UUCheckRun）收集：UU 的安装与进程、抓屏和编码框架还链不链、
 // 一段时间内 UU 的推流日志和 Snug 自己的日志。推流日志用正式运行的那套解析和状态（CaptureLogParser、CaptureSessionState）回放，
 // 查的就是发出去的逻辑。只看日志、不碰 UU，所以要先用手机照常连一次，再回看

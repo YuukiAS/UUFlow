@@ -91,6 +91,7 @@ struct LaunchModeTests {
     @Test("用法里列出登记的远控")
     func usageListsRemotes() {
         #expect(LaunchMode.usage(remotes: ["甲", "乙"]).contains("（远控：甲 / 乙）"))
+        #expect(LaunchMode.usage(remotes: ["甲", "乙"]).contains("用法：UUFlow [模式]"))
     }
 
     @Test("缺参数值、数字写错、两个模式一起：报错而不是悄悄按正常模式启动")
@@ -108,12 +109,12 @@ struct LaunchModeTests {
     @Test("--probe-screens：一份规格一块实验屏；没写的用实验身份和按最大一档算的像素上限")
     func probeScreensDefaults() throws {
         #expect(try LaunchMode.parse(["--probe-screens", "modes=1180x820"]) == .probeScreens([
-            ProbeScreen(name: "Snug 实验屏", serial: 999_000_001, modes: [.init(1180, 820)], maxPixels: .init(2360, 1640), pattern: true),
+            ProbeScreen(name: "UUFlow 实验屏", serial: 999_000_001, modes: [.init(1180, 820)], maxPixels: .init(2360, 1640), pattern: true),
         ]))
         // 像素上限取各档 2 倍后的最大宽、最大高；第二块起按序号排实验身份和名字
         #expect(try LaunchMode.parse(["--probe-screens", "modes=540x950", "modes=1180x820+800x1200"]) == .probeScreens([
-            ProbeScreen(name: "Snug 实验屏", serial: 999_000_001, modes: [.init(540, 950)], maxPixels: .init(1080, 1900), pattern: true),
-            ProbeScreen(name: "Snug 实验屏 2", serial: 999_000_002, modes: [.init(1180, 820), .init(800, 1200)],
+            ProbeScreen(name: "UUFlow 实验屏", serial: 999_000_001, modes: [.init(540, 950)], maxPixels: .init(1080, 1900), pattern: true),
+            ProbeScreen(name: "UUFlow 实验屏 2", serial: 999_000_002, modes: [.init(1180, 820), .init(800, 1200)],
                         maxPixels: .init(2360, 2400), pattern: true),
         ]))
     }
@@ -129,8 +130,8 @@ struct LaunchModeTests {
     @Test("--probe-screens：main=on 把这块设成主屏（V11），最多一块")
     func probeScreensMain() throws {
         #expect(try LaunchMode.parse(["--probe-screens", "modes=540x950", "modes=1470x956,main=on"]) == .probeScreens([
-            ProbeScreen(name: "Snug 实验屏", serial: 999_000_001, modes: [.init(540, 950)], maxPixels: .init(1080, 1900), pattern: true),
-            ProbeScreen(name: "Snug 实验屏 2", serial: 999_000_002, modes: [.init(1470, 956)], maxPixels: .init(2940, 1912),
+            ProbeScreen(name: "UUFlow 实验屏", serial: 999_000_001, modes: [.init(540, 950)], maxPixels: .init(1080, 1900), pattern: true),
+            ProbeScreen(name: "UUFlow 实验屏 2", serial: 999_000_002, modes: [.init(1470, 956)], maxPixels: .init(2940, 1912),
                         pattern: true, main: true),
         ]))
         #expect(throws: LaunchModeError.invalidProbeScreen("modes=1470x956,main=on")) {

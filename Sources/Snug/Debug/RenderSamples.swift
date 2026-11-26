@@ -26,7 +26,6 @@ enum RenderSamples {
         case .menu: menu
         case .screens: screens
         case .library: library
-        case .update: update
         }
     }
 
@@ -42,10 +41,10 @@ enum RenderSamples {
     /// 每种屏各一块：原型上的手机竖屏（开）、iPad 横屏（开）、MacBook Air（关），再加横屏手机、竖屏 iPad 给屏上的面板用
     private static let allScreens = [
         ScreenConfig.legacyPhone(.standard, enabled: true),
-        ScreenConfig(id: tabletID, orientation: .landscape, device: ipad, name: "Snug iPad", serials: [1]),
-        ScreenConfig(id: computerID, orientation: .landscape, device: air, enabled: false, name: "Snug MacBook Air", serials: [2]),
-        ScreenConfig(id: landscapeID, orientation: .landscape, device: .standard, enabled: false, name: "Snug iPhone 17 Pro Max 横屏", serials: [3]),
-        ScreenConfig(id: tabletPortraitID, orientation: .portrait, device: ipad, enabled: false, name: "Snug iPad 竖屏", serials: [4]),
+        ScreenConfig(id: tabletID, orientation: .landscape, device: ipad, name: "UUFlow iPad", serials: [1]),
+        ScreenConfig(id: computerID, orientation: .landscape, device: air, enabled: false, name: "UUFlow MacBook Air", serials: [2]),
+        ScreenConfig(id: landscapeID, orientation: .landscape, device: .standard, enabled: false, name: "UUFlow iPhone 17 Pro Max 横屏", serials: [3]),
+        ScreenConfig(id: tabletPortraitID, orientation: .portrait, device: ipad, enabled: false, name: "UUFlow iPad 竖屏", serials: [4]),
     ]
 
     /// 设置窗口用前三块（同原型）；trouble 那张用满 4 块，看「添加屏幕…」变灰
@@ -97,10 +96,8 @@ enum RenderSamples {
             },
             page("settings-touch", tab: .touch) { _ in },
             page("settings-touch-dark", dark: true, tab: .touch) { s in s.config.screenshot = true },
-            page("settings-general", tab: .general) { s in s.update.check = .upToDate },
+            page("settings-general", tab: .general) { _ in },
             page("settings-general-dark", dark: true, tab: .general) { s in s.screenRecordingTrusted = true },
-            page("settings-general-update-available", tab: .general) { s in s.update.check = .available(sampleFeed) },
-            page("settings-general-too-old", tab: .general) { s in s.update.problem = .tooOld },
             RenderSample(name: "settings-add-screen") {
                 AnyView(AddScreenSheet(state: sampleState(), intents: stub, close: {}))
             },
@@ -152,82 +149,13 @@ enum RenderSamples {
         }
     }
 
-    // MARK: 关于与更新
-
-    private static let sampleCurrent = Version(major: 2, minor: 1, patch: 0)
-
-    /// 样例的 update.json：比当前新两版
-    private static let sampleFeed: UpdateFeed = {
-        let note = { (patch: Int, date: String, message: String) in
-            ReleaseNote(version: Version(major: 2, minor: 1, patch: patch), date: date, tagMessage: message)
-        }
-        let package = UpdatePackage(file: "Snug-2.1.2.pack", chunks: [], files: [])
-        return UpdateFeed(version: Version(major: 2, minor: 1, patch: 2), releases: [
-            note(2, "2026-12-08", """
-                Snug 2.1.2：窗口列表按最近使用排序
-
-                改进
-                - 窗口列表按最近使用排序，常用的窗口排在前面
-                - 「正在打开」提示出现得更快
-
-                修复
-                - 个别 App 放上手机屏后字号没有放大
-                """),
-            note(1, "2026-11-28", """
-                Snug 2.1.1：修复更新后偶尔显示未授权
-
-                修复
-                - 更新后个别情况下辅助功能显示为未授权，实际仍有效
-
-                感谢社区用户反馈。
-                """),
-            note(0, "2026-11-20", "Snug 2.1.0：应用内更新"),
-        ], package: package)
-    }()
+    // MARK: 关于
 
     private static var about: [RenderSample] {
         [
             RenderSample(name: "about") { AnyView(AboutView()) },
             RenderSample(name: "about-dark", dark: true) { AnyView(AboutView()) },
-        ] + [
-            ("about-update-downloading-dark", true, { (u: inout UpdateState) in
-                u.check = .available(sampleFeed)
-                u.phase = .downloading(0.42)
-            }),
-            ("about-update-unreachable", false, { (u: inout UpdateState) in u.problem = .unreachable(.tencent) }),
-            ("about-update-cannot-replace", false, { (u: inout UpdateState) in
-                u.check = .available(sampleFeed)
-                u.problem = .cannotReplace
-            }),
-        ].map { name, dark, configure in
-            RenderSample(name: name, dark: dark) {
-                let s = sampleState()
-                configure(&s.update)
-                return AnyView(GeneralPage(state: s, intents: stub, navigation: stub))
-            }
-        }
-    }
-
-    private static var update: [RenderSample] {
-        [
-            updateSample("update") { _ in },
-            updateSample("update-dark", dark: true) { _ in },
-            updateSample("update-downloading") { $0.phase = .downloading(0.62) },
-            updateSample("update-installing-dark", dark: true) { $0.phase = .installing },
-            updateSample("update-corrupt") { $0.problem = .corrupt },
-            updateSample("update-cannot-replace") { $0.problem = .cannotReplace },
-            updateSample("update-one-behind", current: Version(major: 2, minor: 1, patch: 1)) { _ in },
         ]
-    }
-
-    private static func updateSample(_ name: String, dark: Bool = false, current: Version = sampleCurrent,
-                                     _ configure: @escaping (inout UpdateState) -> Void) -> RenderSample {
-        RenderSample(name: name, dark: dark) {
-            let s = AppState()
-            s.update.check = .available(sampleFeed)
-            configure(&s.update)
-            return AnyView(UpdateView(state: s, current: current, intents: stub, close: {}))
-        }
     }
 
     // MARK: 欢迎页

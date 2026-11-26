@@ -61,7 +61,7 @@ let apps: [(String, String)] = [
     ("settings", "/System/Applications/System Settings.app"), ("music", "/System/Applications/Music.app"),
     ("mail", "/System/Applications/Mail.app"), ("preview", "/System/Applications/Preview.app"),
     ("photos", "/System/Applications/Photos.app"), ("terminal", "/System/Applications/Utilities/Terminal.app"),
-    ("snug", "/Applications/Snug.app"),
+    ("uuflow", "/Applications/UUFlow.app"),
 ]
 for (key, path) in apps {
     guard FileManager.default.fileExists(atPath: path) else { missing.append(path); continue }

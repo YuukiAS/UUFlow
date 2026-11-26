@@ -7,8 +7,6 @@ public enum RenderTarget: String, CaseIterable, Equatable, Sendable {
     /// 设置窗口三页，加添加屏幕、屏幕详情
     case settings
     case welcome, about, legacy
-    /// 查到新版本时的更新窗口（几种状态）
-    case update
     /// 菜单栏菜单
     case menu
     /// 手机、平板屏上的 App 资源库（竖屏、横屏、平板，几种状态）
@@ -40,15 +38,15 @@ public enum LaunchMode: Equatable, Sendable {
     /// remotes：登记的远控在命令行里的名字
     public static func usage(remotes: [String]) -> String {
         """
-        用法：Snug [模式]
+        用法：UUFlow [模式]
           （无参数）                      正常启动
           --preview-screens               正常启动，不等远程就建出开着的屏（开发自测用）
           --render-<界面> <目录>           把界面渲染成 PNG（界面：\(RenderTarget.allCases.map(\.rawValue).joined(separator: " / "))）
           --dump-remote <远控>             打印从这家远控读到的原始信号与屏幕（远控：\(remotes.joined(separator: " / "))）
-          --check-remote <远控> [小时]     这家远控的兼容自检：核对 Snug 依赖它的几处，回看最近几小时的日志（默认 \(defaultCheckHours)，最多 \(maxCheckHours)）
+          --check-remote <远控> [小时]     这家远控的兼容自检：核对 UUFlow 依赖它的几处，回看最近几小时的日志（默认 \(defaultCheckHours)，最多 \(maxCheckHours)）
           --probe-screens <规格> [<规格> …]  实测用：建实验屏、打印模式，按 Ctrl-C 撤掉。规格写成
                                           modes=1180x820+1000x695[,name=名字][,serial=999000001][,cap=像素宽x像素高][,pattern=off][,main=on]
-          --set-mode <屏幕编号> <宽> <高>   把 Snug 的屏换到这一档（点，2 倍）（主程序内部用）
+          --set-mode <屏幕编号> <宽> <高>   把 UUFlow 的屏换到这一档（点，2 倍）（主程序内部用）
           --restore-mode <屏幕编号> <模式编号> <宽> <高> <像素宽> <像素高> <刷新率> session|permanent
                                           把一块屏设回这个模式，只对本次登录或连永久配置（主程序内部用）
         """

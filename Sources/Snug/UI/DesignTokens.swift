@@ -40,8 +40,6 @@ enum MacTokens {
         static func screen(symbol: String) -> TileToken { TileToken(color: SwiftUI.Color(nsColor: .systemBlue), symbol: symbol) }
         static let screenRecording = TileToken(color: SwiftUI.Color(nsColor: .systemRed), symbol: "record.circle")
         static let screenshot = TileToken(color: SwiftUI.Color(nsColor: .systemPink), symbol: "camera.viewfinder")
-        static let update = TileToken(color: SwiftUI.Color(nsColor: .systemBlue), symbol: "arrow.down")
-        static let updateSource = TileToken(color: SwiftUI.Color(nsColor: .systemGray), symbol: "server.rack")
         static let zoom = TileToken(color: SwiftUI.Color(nsColor: .systemGreen), symbol: "textformat.size")
     }
     enum Radius {

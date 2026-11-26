@@ -1,5 +1,5 @@
-// Snug：用手机通过 UU远程 用 Mac 时，窗口铺满手机、字够大、手势顺手。
-// 这里只负责按启动模式组装；各模式见 LaunchMode（SnugCore）
+// UUFlow：通过 UU远程 使用 Mac 时，为每台控制端提供适配的专属屏幕。
+// 这里只负责按启动模式组装；各模式见 LaunchMode（SnugCore）。内部 target 继续叫 Snug 以保持构建兼容。
 import AppKit
 import SnugCore
 import SnugSystem

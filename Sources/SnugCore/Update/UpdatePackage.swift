@@ -1,6 +1,6 @@
-// 更新包：一个版本的 Snug.app 怎么从块拼出来。
-// 包（Snug-<版本>.pack）里依次放着这个版本用到的每一块：去重，逐块 LZMA 压缩，首尾相接。
-// 清单记着每块在包里的位置、每个文件由哪几块组成。发布时 make 打包；更新时把装着的 Snug.app 切开（chunks(in:)），
+// 更新包：一个版本的 UUFlow.app 怎么从块拼出来。
+// 包（UUFlow-<版本>.pack）里依次放着这个版本用到的每一块：去重，逐块 LZMA 压缩，首尾相接。
+// 清单记着每块在包里的位置、每个文件由哪几块组成。发布时 make 打包；更新时把装着的 UUFlow.app 切开（chunks(in:)），
 // 本机没有的块按字节范围从包里取（missingRanges → unpack），拼出新版本（assemble）。
 // 不挑从哪个版本升：缺什么取什么。每块都核对 sha256，拼出来的和发布的逐字节相同，签名照旧有效
 import Foundation
@@ -27,7 +27,7 @@ public struct UpdatePackage: Codable, Equatable, Sendable {
     }
 
     public struct File: Codable, Equatable, Sendable {
-        /// 相对应用包，比如 Contents/MacOS/Snug
+        /// 相对应用包，比如 Contents/MacOS/UUFlow
         public let path: String
         public let executable: Bool
         /// 依次由哪几块拼成（chunks 的下标）。空文件没有块

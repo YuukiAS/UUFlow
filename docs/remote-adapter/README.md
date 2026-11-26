@@ -13,7 +13,7 @@
   - 核心只留中性端口。
   - UU 做成独立适配器：纯逻辑、系统调用各一个目标，外加自己的测试目标。
   - App 只有一个登记适配器的地方。
-  - 核心不认识任何适配器，由编译器保证；字符串里的残留，由 `scripts/snug check` 门禁保证（落地后按 `Sources/Remotes` 下的目录名查每一家，见 12.1）。
+  - 核心不认识任何适配器，由编译器保证；字符串里的残留，由 `scripts/uuflow check` 门禁保证（落地后按 `Sources/Remotes` 下的目录名查每一家，见 12.1）。
 - **接口很小：** 身份，加上 `start`、`stop`、`sample` 三个方法。手势形态、模式恢复、主屏策略、时序常量都不进接口：要么两家情况相同，要么核心已有通用机制兜住。⚠️ 11-20 更正：手势形态并不相同（RustDesk 触摸模式实测），手势只拆了一半，见 12.4。
 - **只有 UU 时行为不变，日志逐字不变**，验收时拿真机日志逐行对照。
 - 11 项决定已拍板（第 9 节），全部按推荐执行。
@@ -36,8 +36,8 @@
 |---|---|
 | `SnugCore/Session/` | `UURemote`（身份常量）、`UUSignals`（三路证据）、`ControllerTable`（被控页界面树）、`CaptureLogParser`、`CaptureSessionState`（推流日志与状态）、`UUProcessWatch` |
 | `SnugCore/Diagnostics/UUCheck.swift` | UU 兼容自检的判定 |
-| `Snug/Sensing/`（整个目录） | `UUSensor`、`CaptureLogWatcher`、`ControllerReader`、`UUAccessibility`、`UURemoteApp` |
-| `Snug/Debug/` | `UUDump`、`UUCheckRun` |
+| `UUFlow/Sensing/`（整个目录） | `UUSensor`、`CaptureLogWatcher`、`ControllerReader`、`UUAccessibility`、`UURemoteApp` |
+| `UUFlow/Debug/` | `UUDump`、`UUCheckRun` |
 | 测试 | `CaptureLogTests`、`ControllerTableTests`、`UUProcessWatchTests`、`UUCheckTests`，4 份 `uuremoteserver-*.ndjson` 夹具 |
 
 ### 3.2 共用代码里夹带的 UU 语义（要中性化）
@@ -52,7 +52,7 @@
 | `LaunchMode.swift:42,87,89` | 核心启动参数引用 `UUCheck` 的常量（已核实） | 小时上下限归 LaunchMode 自己；参数名见决定 5 |
 | `SnugLogDigest` | 解析「检测到 UU 连入（」和 `overlay=`、`capture=`；跨模块的字符串约定 | 见 3.5 |
 | `Package.swift:32` | `SnugCoreTests` 声明了 Fixtures 资源，而里面只有 UU 的夹具 | 资源声明随夹具挪到 UU 测试目标 |
-| `AppController`、`main.swift` | 直接创建 UU 感知器、直接调用 UU 诊断 | 改由唯一登记处 `Snug/App/Remotes.swift` 提供 |
+| `AppController`、`main.swift` | 直接创建 UU 感知器、直接调用 UU 诊断 | 改由唯一登记处 `Sources/Snug/App/Remotes.swift` 提供 |
 
 ### 3.3 隐性耦合：留在共用代码里（核心、系统层、App 层），改成中性命名并注明「UU 实测」
 
@@ -67,7 +67,7 @@
 
 ### 3.4 不是适配层，别误搬
 
-- 旧版「UU远程伴侣」的冲突检测：`LegacyApp`、`LegacyNotice` 等。它处理的是和 Snug 前身的冲突，不是远控。
+- 旧版「UU远程伴侣」的冲突检测：`LegacyApp`、`LegacyNotice` 等。它处理的是和 UUFlow 前身的冲突，不是远控。
 - `AboutView` 里对 UUyc-companion 的致谢，以及「非 UU远程 官方软件」的免责声明。
 
 ### 3.5 最容易「悄悄失效」的一处：日志约定
@@ -103,7 +103,7 @@ Sources/
     UU/
       Logic/   → 目标 RemoteUU：UURemote、UUSignals、ControllerTable、CaptureLogParser、CaptureSessionState、UUProcessWatch、UUCheck
       System/  → 目标 RemoteUUSystem：UURemoteAdapter（原 UUSensor）、UURemoteApp、UUAccessibility、ControllerReader、CaptureLogWatcher、UUDump、UUCheckRun
-  Snug/
+  UUFlow/
     App/Remotes.swift          ← 新：唯一登记适配器的地方，加诊断分派
     （Sensing/ 删除；Debug/ 只剩 Renderer、RenderSamples、ScreenProbe）
 Tests/
@@ -120,8 +120,8 @@ Tests/
 SnugSystem      → SnugCore
 RemoteUU        → SnugCore
 RemoteUUSystem  → RemoteUU, SnugSystem, SnugCore
-Snug（App）      → SnugCore, SnugSystem, RemoteUUSystem
-SnugRelease     → SnugCore
+Snug（UUFlow App 内部 target）→ SnugCore, SnugSystem, RemoteUUSystem
+SnugRelease（历史，已退役） → SnugCore
 SnugCoreTests   → SnugCore
 RemoteUUTests   → RemoteUU, SnugCore（带 Fixtures）
 RemoteContractTests → SnugCore, 每家的纯逻辑目标（RemoteUU）
@@ -175,7 +175,7 @@ public struct RemoteObservation: Equatable, Sendable {
 | 成员 | UU 怎么实现 | RustDesk（源码事实）装得下吗 |
 |---|---|---|
 | `bundleIDs` | `com.netease.uuremote` | `com.carriez.rustdesk`，装得下 |
-| `injector` | 进程名 `UURemoteServer` | 能装下，但不够精确：它的 `--server` 和界面是同一个可执行文件。它的事件带 `eventSourceUserData=100`，接它时再加一个可选的 `userData` 字段，纯增量。注意 Snug 补发事件会把这个字段改写成自己的标记（`TouchEvents.swift:33`），所以匹配必须看原始事件；现有逻辑就是先看原始事件 |
+| `injector` | 进程名 `UURemoteServer` | 能装下，但不够精确：它的 `--server` 和界面是同一个可执行文件。它的事件带 `eventSourceUserData=100`，接它时再加一个可选的 `userData` 字段，纯增量。注意 UUFlow 补发事件会把这个字段改写成自己的标记（`TouchEvents.swift:33`），所以匹配必须看原始事件；现有逻辑就是先看原始事件 |
 | `start`/`stop` | KVO 加 `log stream` 子进程 | 盯 `--cm` 进程或窗口，装得下 |
 | `sample` | `present` 取 `UUSignals.isPresent`；`evidence` 取 `UUSignals.description`，日志逐字不变 | `present` 看 `--cm` 在不在；控制端取登录信息；推流屏先报 nil，装得下 |
 
@@ -244,10 +244,10 @@ public struct RemoteObservation: Equatable, Sendable {
 - 空闲和读不到都不算在场。
 - 标准时序产出完全相同的会话转换序列：began → controllersChanged → interrupted → resumed → interrupted → ended。
 - 能报推流屏的断言屏号；不能报的断言一直是 nil，不允许跳过不测。
-- 注入事件为真，本机事件和 Snug 补发事件为假。
+- 注入事件为真，本机事件和 UUFlow 补发事件为假。
 - 自身 bundle 不出现在资源库里。
 
-**完整性检查：** `Remotes.swift` 里登记的适配器和契约驱动必须一一对应，在 `scripts/snug check` 里比对。这样新接一家漏写驱动，check 当场就失败。
+**完整性检查：** `Remotes.swift` 里登记的适配器和契约驱动必须一一对应，在 `scripts/uuflow check` 里比对。这样新接一家漏写驱动，check 当场就失败。
 
 ### 7.5 本次不做（记为技术债）
 
@@ -259,12 +259,12 @@ public struct RemoteObservation: Equatable, Sendable {
 
 要测得先抽成纯值类型，属于另一件事，不在这次范围里。
 
-## 8. 防回潮：`scripts/snug check` 加门禁
+## 8. 防回潮：`scripts/uuflow check` 加门禁
 
 > 落地后的门禁比本节更严，以 12.1 和 [防回潮](../remotes/README.md#防回潮) 为准。
 
 1. `Sources/SnugCore`、`Sources/SnugSystem` 的字符串字面量里不许出现 UU 身份（如 `com.netease.uuremote`、`UURemoteServer`、「检测到 UU」）。注释里「UU 实测」这类出处说明允许。
-2. `import RemoteUU*` 只允许出现在 `Snug/main.swift` 和 `Snug/App/Remotes.swift`。
+2. `import RemoteUU*` 只允许出现在 `Sources/Snug/App/Remotes.swift`。
 3. `Tests/SnugCoreTests` 里不许出现 UU 类型名。
 4. `Package.swift` 声明的测试目标和 `Tests/` 下的目录一致（SwiftPM 会静默忽略没声明的目录）。
 5. `Remotes.swift` 登记的适配器和契约驱动一一对应（若采用契约测试）。
@@ -279,7 +279,7 @@ public struct RemoteObservation: Equatable, Sendable {
 | 2 | 适配器放哪 | **归到 `Sources/Remotes/<家>/`、`Tests/Remotes/<家>/`**（Package.swift 写明 path），「接新远控去哪看」一眼可见 | 默认路径平铺：`Sources/RemoteUU`、`Sources/RemoteUUSystem` |
 | 3 | `SnugCore/Session` 改名 `Remote` | **改**，端口、会话、日志解析都在里面，便于社区找入口 | 不改，少一批改动 |
 | 4 | 契约测试现在建不建 | **建**，只有 UU 一个驱动。它和接入文档一起构成留给社区的「口子」 | 等第二家来了再抽 |
-| 5 | 诊断参数 | **中性化：** `--dump-remote <名>`、`--check-remote <名> [小时]`、`scripts/snug remote-check <名>`；旧的 `-uu` 不留别名，文档和记忆同步改 | 保留 `--dump-uu`、`--check-uu`、`uu-check`，门禁单独放行 |
+| 5 | 诊断参数 | **中性化：** `--dump-remote <名>`、`--check-remote <名> [小时]`、`scripts/uuflow remote-check <名>`；旧的 `-uu` 不留别名，文档和记忆同步改 | 保留 `--dump-uu`、`--check-uu`、`uu-check`，门禁单独放行 |
 | 6 | 日志是否逐字不变 | **不变：** 身份里带 `logName`（"UU"），日志仍写「检测到 UU 连入」，验收时逐行对照 | 日志改用显示名「UU远程」，解析器两种都认 |
 | 7 | 遮挡常量 | **留核心：** `uuInset` 改成 `clientToolbarInset`，注明按 UU 实测标定 | 每块屏加「给哪家用」字段（相当于选择开关，违反原则 3） |
 | 8 | 界面文案 | **运行期提到工具名的地方**用 `displayName` 拼（只有 UU 时逐字不变）；**陈述 UU 特有事实的静态文案**（设置页「一次只让一台设备控制」等）作为产品定位保留，接第二家时再改 | 全部改成中性说法 |
@@ -289,7 +289,7 @@ public struct RemoteObservation: Equatable, Sendable {
 
 ## 10. 落地顺序与验收
 
-在本分支上每步一个 commit，每步跑 `scripts/snug check`，记录测试用例数（基线约 445，只增不减）：
+在本分支上每步一个 commit，每步跑 `scripts/uuflow check`，记录测试用例数（基线约 445，只增不减）：
 
 1. **核心中性化（先写测试）：** 加入 `RemoteObservation` 等类型；挪 `ConnectionEvent`；`ConnectionTracker`、`RemoteSession` 改吃中性观测，暂由 App 层做 UU 映射；核心测试改用中性假观测；日志产出函数和往返测试；UUCheck 的「静默消失」改报需留意。
 2. **注入事件与资源库排除：** 中性匹配器，`TouchTap` 改为注入；排除名单改成参数，过滤收到 `AppCatalog` 一处，系统层不再过滤。
@@ -302,8 +302,8 @@ public struct RemoteObservation: Equatable, Sendable {
    - 记忆同步。
 
 **验收：**
-- `scripts/snug check` 全绿，用例数不降，门禁全过。
-- 真机连一次 UU：Snug.log 里连入、断开、会话、建屏这几行和改动前逐字一致。
+- `scripts/uuflow check` 全绿，用例数不降，门禁全过。
+- 真机连一次 UU：UUFlow.log 里连入、断开、会话、建屏这几行和改动前逐字一致。
 - `remote-check uu` 全部 ✅。
 
 ## 11. 三份报告的分歧与裁决
@@ -331,15 +331,15 @@ public struct RemoteObservation: Equatable, Sendable {
 | 日志摘要 | 解析器留核心，加往返测试 | 另加按远控归属：会话行归到前面最近一行「检测到 <远控> 连入」的那家，找不到的照旧算进来 | 会话行不带远控名，接第二家后 UU 自检会把别家的远程算成 UU 的 |
 | 观测怎么交给会话 | `sample` 交 `RemoteObservation` | 另有 `RemoteReading`（哪家加观测）；`RemoteSession.tracked` 是这一拍跟的那份 | 归属规则要知道观测来自哪家 |
 | 注入事件匹配 | `matches(executableName:)` | `matches(executablePath:)`，按路径的最后一段比 | 系统层读到的是来源进程的完整路径 |
-| 门禁 | 5 条 grep | 名字检查从「字符串字面量里的 UU」扩大到核心、系统层、核心测试的所有代码行，名字取 `Sources/Remotes` 下的每个目录，按子串、大小写都拦，只放过单独一行的注释，撞上无关子串走放行表（`UUID`、`com.todesktop`）；import 只放行 `Snug/App/Remotes.swift`（`main.swift` 经 `Remotes.dump`、`check` 分派），只认行首的 import 语句，`@testable`、`internal import` 等写法都认；`Package.swift` 交给 `swift package dump-package` 解析，检查的目录也从它取，按目录核对每家的三个目标、登记（`<家>RemoteAdapter.self`）、契约依赖与驱动，注释掉的不算；纯逻辑目标只能 import Foundation、SnugCore，只依赖 SnugCore；grep 出错报错退出，不当成没命中 | 审查发现小写字面量、多行写法、只 import 不登记都能绕过；合并前两轮核查又发现：名字检查只认 UU、`UUIdentity` 能混过、ToDesk 会撞上 Cursor 的 bundle、纯逻辑 import 行尾带注释被误拦、注释掉的登记照样通过、grep 出错被当成干净 |
+| 门禁 | 5 条 grep | 名字检查从「字符串字面量里的 UU」扩大到核心、系统层、核心测试的所有代码行，名字取 `Sources/Remotes` 下的每个目录，按子串、大小写都拦，只放过单独一行的注释，撞上无关子串走放行表（`UUID`、`com.todesktop`）；import 只放行 `Sources/Snug/App/Remotes.swift`（`main.swift` 经 `Remotes.dump`、`check` 分派），只认行首的 import 语句，`@testable`、`internal import` 等写法都认；`Package.swift` 交给 `swift package dump-package` 解析，检查的目录也从它取，按目录核对每家的三个目标、登记（`<家>RemoteAdapter.self`）、契约依赖与驱动，注释掉的不算；纯逻辑目标只能 import Foundation、SnugCore，只依赖 SnugCore；grep 出错报错退出，不当成没命中 | 审查发现小写字面量、多行写法、只 import 不登记都能绕过；合并前两轮核查又发现：名字检查只认 UU、`UUIdentity` 能混过、ToDesk 会撞上 Cursor 的 bundle、纯逻辑 import 行尾带注释被误拦、注释掉的登记照样通过、grep 出错被当成干净 |
 | 契约测试 | 驱动提供六种原始输入；标准时序产出相同的转换序列 | `RemoteDriver`（`Tests/RemoteContractTests/RemoteDriver.swift`）交 `idle()`、`unreadable()`、`connected(controllers:)`、`streaming(_:)` 四种情形，以及身份、能否报控制端与推流屏、注入进程路径、自家 bundle；注入事件拿注入进程路径和几条固定路径比；认不出控制端的远控跳过 `controllersChanged`；另断言每次观测的信号快照不为空，日志名不为空、不含空格、不重名 | 注入事件、本机事件在系统层生成，契约测试只能比路径；各家能报的信号不同，序列按能力分支 |
 | UUCheck 的连接检测 | 认不出连入时报需留意 | 同上，另外信号快照读不出也报需留意；推流信号全部未知时这一项照旧不出 | 只修静默失效，其余输出和抽出前一致 |
 
 ### 12.2 验收
 
-- `scripts/snug check`：门禁全过，测试 445 → 472 例全绿（`SnugCoreTests` 415、`RemoteUUTests` 50、`RemoteContractTests` 7）
+- `scripts/uuflow check`：门禁全过，测试 445 → 472 例全绿（`SnugCoreTests` 415、`RemoteUUTests` 50、`RemoteContractTests` 7）
 - 门禁：11 个违规样本各自拦下，目标写成多行照常通过；名字检查改为按目录后，另 10 个样本结果符合预期（含同一行 UUID 加 UU、行尾注释、第二家 Demo 的 bundle 与进程名）；第二轮核查后重写，24 个样本全部符合预期（含 `UUIdentity`、注释掉的登记、纯逻辑行尾注释、ToDesk 目录、目录名带点），grep 出错时报错退出；契约测试改坏 UU 驱动后当场变红
-- 照指南接入：只看 [接入新的远控](../remotes/README.md) 的 agent 在隔离工作区先后接入假远控 Demo、Parsec（第二次用修订后的指南），`scripts/snug check` 都一次通过，指南里写漏的地方已补
+- 照指南接入：只看 [接入新的远控](../remotes/README.md) 的 agent 在隔离工作区先后接入假远控 Demo、Parsec（第二次用修订后的指南），`scripts/uuflow check` 都一次通过，指南里写漏的地方已补
 - 与抽出前对比：81 张界面渲染逐字节一致；`--dump-remote uu`、`--check-remote uu` 与旧 `--dump-uu`、`--check-uu` 输出逐字一致
 - 真机（UU远程 4.48.1，iPhone）：连入、会话、建屏、手势开启、放窗口、断开、重连等待、结束、撤屏 14 条日志里 13 条与之前正式版的写法逐字一致，剩下 1 条是没改动、之前没触发过的指针收回（#29）；资源库里没有 UU远程；点按、滚动、长按右键正常；`remote-check uu` 7 项全部 ✅
 
@@ -367,7 +367,7 @@ public struct RemoteObservation: Equatable, Sendable {
 - 契约测试加一组：各家把自家典型的点按、滑动、长按序列整理成同一串标准输入
 - 验收照 12.2：只登记 UU 时，手势行为与日志逐字不变
 
-**审那个 PR 时另要逐条核实的**：fork 里还一并做了几处不属于手势整理的改动，作用范围要逐条确认：远程期间隐藏 Snug 屏上的系统光标（按代码看对所有远控生效）；点按吸附到控件中心（每次点按查一次辅助功能）；点按反馈圈（黄圈、蓝框、红点，像调试画面）；快滑成批到达不再判成长按（改的是共用翻译器）。每条先问：是不是通用、会不会改变只有 UU 时的行为。`.memory` 的改动不收。
+**审那个 PR 时另要逐条核实的**：fork 里还一并做了几处不属于手势整理的改动，作用范围要逐条确认：远程期间隐藏 UUFlow 屏上的系统光标（按代码看对所有远控生效）；点按吸附到控件中心（每次点按查一次辅助功能）；点按反馈圈（黄圈、蓝框、红点，像调试画面）；快滑成批到达不再判成长按（改的是共用翻译器）。每条先问：是不是通用、会不会改变只有 UU 时的行为。`.memory` 的改动不收。
 
 ## 附：调研原始报告
 

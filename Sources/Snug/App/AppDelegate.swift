@@ -1,7 +1,6 @@
 // 正常启动：组装 AppController、菜单栏、各块屏上的面板、窗口与退出流程。
 // 第一次打开：自动设成开机启动，弹欢迎页（讲用法、请用户允许辅助功能）。之后就不用管了。
 // 用户亲手打开（双击、Dock、启动台、聚焦搜索），或者运行中再点一次：弹设置页，状态、开关、权限一眼看全。开机自启不弹。
-// 刚换了版本（应用内更新后重新打开、手动替换）：弹「关于 Snug」，新版本号一眼可见
 import AppKit
 import SnugCore
 
@@ -27,14 +26,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     func applicationDidFinishLaunching(_ note: Notification) {
         launchedAtLogin = Self.launchedAsLoginItem
-        Log.info("启动 Snug \(Updater.current?.description ?? "开发版")（\(launchedAtLogin ? "开机自启" : "手动打开")），"
+        Log.info("启动 UUFlow \(AppIdentity.versionText)（\(launchedAtLogin ? "开机自启" : "手动打开")），"
             + "辅助功能权限：\(controller.state.accessibilityTrusted ? "已授权" : "未授权")")
         statusBar = StatusBarController(state: controller.state, intents: controller, navigation: router)
         let controller = controller
         panels = ScreenPanels(state: controller.state, catalog: controller.catalog) { ScreenIntents(id: $0, app: controller) }
         handleSIGTERM()
-        controller.updater.onNewVersion = { [weak self] userInitiated in self?.router.showUpdate(activating: userInitiated) }
-        controller.updater.onInstalled = { [weak self] in self?.quitFlow.userQuit() }
         legacyObservers = LegacyApp.observe { [weak self] running in
             self?.controller.state.legacyAppRunning = running
             if !running { self?.router.legacyAppGone() }
@@ -52,13 +49,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         quitFlow.shouldTerminate(sender)
     }
 
-    /// 运行中再双击、点 Dock 里的 Snug：弹设置页。Snug 没有常驻窗口，不处理的话这一下看起来毫无反应
+    /// 运行中再双击、点 Dock 里的 UUFlow：弹设置页。UUFlow 没有常驻窗口，不处理的话这一下看起来毫无反应
     func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
         router.openSettings()
         return false
     }
 
-    /// 打开 Snug 的窗口、或从系统设置点回来时，刷新开机启动的状态：设置页的「前往允许」就是让人去「登录项」走一趟再回来
+    /// 打开 UUFlow 的窗口、或从系统设置点回来时，刷新开机启动的状态：设置页的「前往允许」就是让人去「登录项」走一趟再回来
     func applicationDidBecomeActive(_ notification: Notification) {
         controller.refreshLaunchAtLogin()
     }
@@ -87,15 +84,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private func startMonitoring() {
         controller.start()
         controller.refreshLaunchAtLogin()
-        controller.updater.check(userInitiated: false, waitForNetwork: launchedAtLogin)
-        let updated = controller.recordVersion()
+        controller.recordVersion()
         if !controller.state.config.welcomed {
             if !controller.state.launchAtLogin { controller.setLaunchAtLogin(true) }
             router.showFirstWelcome()
         } else if !controller.state.accessibilityTrusted {
             router.openWelcome()
-        } else if updated {
-            router.openAbout()
         } else if !launchedAtLogin {
             router.openSettings()
         }

@@ -88,7 +88,7 @@ struct ScreenPlanTests {
         #expect(phoneWishes[0].spec.productID == ScreenSpec.portraitProductID)
         #expect(phoneWishes[0].spec.maxPixels == ScreenFit.portraitPixels)
         #expect(phoneWishes[0].spec.serials == [200_000_108, 200_000_118, 200_000_128])
-        #expect(phoneWishes[0].spec.name == "Snug 手机屏")
+        #expect(phoneWishes[0].spec.name == "UUFlow 手机屏")
         #expect(tabletWishes[0].spec.productID == ScreenSpec.landscapeProductID)
         #expect(tabletWishes[0].spec.maxPixels == ScreenFit.landscapePixels)
     }
@@ -310,14 +310,14 @@ struct ScreenConfigTests {
         func name(_ model: String?, _ kind: DeviceKind, _ o: Orientation) -> String {
             ScreenConfig.suggestedName(for: DeviceChoice(model: model, screen: DeviceScreen(width: 9, height: 20), kind: kind), orientation: o)
         }
-        #expect(name("Apple iPhone 17 Pro Max", .phone, .portrait) == "Snug iPhone 17 Pro Max")
-        #expect(name("Apple iPhone 17 Pro Max", .phone, .landscape) == "Snug iPhone 17 Pro Max 横屏")
-        #expect(name("Apple iPad（第 10 代）", .tablet, .landscape) == "Snug iPad")
-        #expect(name("Apple iPad Pro 11 英寸（M5）", .tablet, .portrait) == "Snug iPad Pro 竖屏")
-        #expect(name("Apple MacBook Air 13 英寸（M4）", .computer, .landscape) == "Snug MacBook Air")
-        #expect(name("华为 MatePad Pro 13.2 英寸", .tablet, .landscape) == "Snug 华为 MatePad Pro")
-        #expect(name("通用 1920 × 1080", .computer, .landscape) == "Snug 电脑")
-        #expect(name(nil, .tablet, .landscape) == "Snug 平板")
-        #expect(name(nil, .phone, .portrait) == "Snug 手机")
+        #expect(name("Apple iPhone 17 Pro Max", .phone, .portrait) == "UUFlow iPhone 17 Pro Max")
+        #expect(name("Apple iPhone 17 Pro Max", .phone, .landscape) == "UUFlow iPhone 17 Pro Max 横屏")
+        #expect(name("Apple iPad（第 10 代）", .tablet, .landscape) == "UUFlow iPad")
+        #expect(name("Apple iPad Pro 11 英寸（M5）", .tablet, .portrait) == "UUFlow iPad Pro 竖屏")
+        #expect(name("Apple MacBook Air 13 英寸（M4）", .computer, .landscape) == "UUFlow MacBook Air")
+        #expect(name("华为 MatePad Pro 13.2 英寸", .tablet, .landscape) == "UUFlow 华为 MatePad Pro")
+        #expect(name("通用 1920 × 1080", .computer, .landscape) == "UUFlow 电脑")
+        #expect(name(nil, .tablet, .landscape) == "UUFlow 平板")
+        #expect(name(nil, .phone, .portrait) == "UUFlow 手机")
     }
 }

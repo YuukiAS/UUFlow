@@ -4,7 +4,7 @@ import Testing
 
 @Suite("配置 AppConfig")
 struct ConfigModelTests {
-    @Test("默认值：只有一块开着的竖屏手机屏（17 Pro Max），没有控制端绑定、不改主屏；手势开着，截图键关着，字号默认放大 2 级，还没看过欢迎页，从腾讯云更新")
+    @Test("默认值：只有一块开着的竖屏手机屏（17 Pro Max），没有控制端绑定、不改主屏；手势开着，截图键关着，字号默认放大 2 级，还没看过欢迎页")
     func defaults() {
         let c = AppConfig()
         #expect(c.screens == [.legacyPhone(.standard, enabled: true)])
@@ -14,8 +14,24 @@ struct ConfigModelTests {
         #expect(!c.screenshot)
         #expect(c.zoomSteps == 2)
         #expect(!c.welcomed)
-        #expect(c.updateSource == .tencent)
         #expect(c.lastVersion == nil)
+    }
+
+    @Test("旧版 updateSource 可继续读取但不再影响或写回配置")
+    func ignoresLegacyUpdateSource() throws {
+        let c = try decode(#"{"updateSource":"tencent","gestures":false}"#)
+        #expect(!c.gestures)
+        let json = try #require(JSONSerialization.jsonObject(with: JSONEncoder().encode(c)) as? [String: Any])
+        #expect(json["updateSource"] == nil)
+    }
+
+    @Test("旧品牌屏幕名称迁移为 UUFlow，屏幕身份、路由与序列号原样保留")
+    func migratesProductNamesWithoutChangingIdentity() throws {
+        let c = try decode(#"{"screens":[{"id":"phone","orientation":"landscape","device":{"model":"一加 12","screen":{"width":1440,"height":3168},"kind":"phone"},"enabled":true,"name":"Snug 一加 12 横屏","serials":[200000108,200000118]}],"controllerBindings":[{"name":"一加 12 全网通版","screen":"phone"}]}"#)
+        #expect(c.screens[0].name == "UUFlow 一加 12 横屏")
+        #expect(c.screens[0].id == .phone)
+        #expect(c.screens[0].serials == [200_000_108, 200_000_118])
+        #expect(c.binding(for: "一加 12 全网通版")?.screen == .phone)
     }
 
     private func decode(_ json: String) throws -> AppConfig {
@@ -28,7 +44,7 @@ struct ConfigModelTests {
         let phone = DeviceChoice(model: "华为 Mate 70 Pro", screen: DeviceScreen(width: 1260, height: 2832))
         #expect(c.screens == [.legacyPhone(phone, enabled: false)])
         #expect(c.screens[0].id == .phone)
-        #expect(c.screens[0].name == "Snug 手机屏")
+        #expect(c.screens[0].name == "UUFlow 手机屏")
         #expect(c.screens[0].serials == [200_000_108, 200_000_118, 200_000_128])
         #expect(c.screens[0].device.kind == .phone)
         #expect(c.zoomSteps == 3)
@@ -102,8 +118,8 @@ struct ConfigModelTests {
         let b = c.addScreen(orientation: .landscape, device: .standard, now: AppConfig.serialEpoch)!
         #expect(a.serials == [200_100_000, 200_100_001, 200_100_002])
         #expect(b.serials == [200_100_010, 200_100_011, 200_100_012])
-        #expect(a.name == "Snug iPad")
-        #expect(b.name == "Snug iPhone 17 Pro Max 横屏")
+        #expect(a.name == "UUFlow iPad")
+        #expect(b.name == "UUFlow iPhone 17 Pro Max 横屏")
         #expect(a.id != b.id)
         c.removeScreen(a.id)
         let d = c.addScreen(orientation: .portrait, device: .standard, name: "我的手机", now: AppConfig.serialEpoch)!
@@ -286,10 +302,9 @@ struct ConfigModelTests {
         #expect(throws: DecodingError.self) { try decode(#"{"screens":{"id":"a"},"phoneScreen":true}"#) }
     }
 
-    @Test("不认识的更新源（比如更新的版本写的）用默认值，不把整份配置判为损坏")
+    @Test("不认识的旧更新源也被忽略，不把整份配置判为损坏")
     func unknownUpdateSource() throws {
         let c = try JSONDecoder().decode(AppConfig.self, from: Data(#"{"updateSource":"mirror","zoomSteps":3}"#.utf8))
-        #expect(c.updateSource == .tencent)
         #expect(c.zoomSteps == 3)
     }
 
@@ -321,7 +336,6 @@ struct ConfigModelTests {
         c.screenshot = true
         c.zoomSteps = 3
         c.welcomed = true
-        c.updateSource = .github
         c.lastVersion = Version(major: 2, minor: 1, patch: 0)
         c.screens[0].device = DeviceChoice(model: "华为 Mate 70 Pro", screen: DeviceScreen(width: 1260, height: 2832))
         c.addScreen(orientation: .landscape, device: DeviceChoice(model: nil, screen: DeviceScreen(width: 1600, height: 2560, notch: 30), kind: .computer))

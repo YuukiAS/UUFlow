@@ -1,4 +1,4 @@
-// 版本号：主.次.修订，按数比大小（2.10.0 比 2.9.9 新）。Snug 只发正式版，和 scripts/snug 认的写法一样
+// 版本号：主.次.修订，按数比大小（2.10.0 比 2.9.9 新）。和 scripts/uuflow 认的写法一样
 import Foundation
 
 public struct Version: Comparable, Hashable, Sendable, Codable, LosslessStringConvertible {

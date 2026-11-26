@@ -1,163 +1,478 @@
 # UUFlow Roadmap
 
-UUFlow 基于 [zephyr4123/snug](https://github.com/zephyr4123/snug) 的 MIT 许可代码继续开发。上游已经解决被控 Mac 上的虚拟屏、窗口管理、UU远程 会话识别、手机/平板触控和 App 资源库；UUFlow 在此基础上补齐“不同控制端得到不同远控体验”和电脑控制端的本机 / 远端输入切换。
+UUFlow 是基于 [zephyr4123/snug](https://github.com/zephyr4123/snug) 继续发展的独立产品。上游提供了成熟的虚拟屏、窗口管理、移动端触控和远控适配基础；UUFlow 在此基础上继续解决多控制端专属屏、控制端识别、输入语义切换和远程电脑操作体验。
+
+项目继续保留上游 MIT 许可、版权与必要的技术致谢，但从这一阶段开始，**用户看到的产品只叫 UUFlow**。
+
+---
 
 ## 产品边界
 
-最终形态分三端：
+UUFlow 最终由两部分组成。
 
-- **Mac mini / 被控 Mac**：安装 UUFlow 主体。负责虚拟屏、窗口管理、UU 会话与控制端识别、手机/平板触控增强，以及按控制端选择对应屏幕或旁路。
-- **macOS 电脑控制端**：安装轻量 Controller。负责本机 / 远端输入模式，让同一套快捷键和后续触控板手势按需作用于控制端本机或远程 Mac。
-- **Windows 电脑控制端**：安装轻量 Controller，职责与 macOS Controller 相同。
-- **手机 / iPad / Android 平板**：只安装 UU远程，不安装 Controller；由 Mac mini 上的 UUFlow 提供专属虚拟屏、触控和 App 资源库。
+### 被控 Mac：UUFlow
 
-UUFlow 不复制 UU远程 的传输协议。远程画面与键鼠传输继续由 UU远程负责。
+安装在 Mac mini / 其他被控 Mac 上，负责：
 
----
+- 识别当前 UU远程 控制端；
+- 为手机、平板、电脑按设备创建对应的专属虚拟屏；
+- 按控制端决定创建专属屏或完全旁路；
+- 手机、平板的触控、App 资源库和窗口适配；
+- 电脑控制端的专属屏、临时主屏与显示恢复；
+- 输出当前控制端的本地状态，作为键盘模式的唯一识别来源。
 
-## Phase 1：设备专属屏与自动路由
+### 电脑控制端：UUFlow Controller
 
-目标是让不同控制端连接同一台 Mac mini 时得到各自合适的屏幕；不需要增强显示的设备保持原来的 UU远程 体验。
+安装在 MacBook / Windows 电脑控制端，只负责本机与远端输入路由：
 
-### 路由规则
+- LOCAL：快捷键和手势作用于控制端本机；
+- REMOTE：选定快捷键和后续手势只作用于远程 Mac；
+- 不复制虚拟屏、窗口管理或远控传输；
+- 不修改 UU远程 本体。
 
-UUFlow 复用现有“本机被控中”控制端读取能力，根据 UU 实际报告的控制端名称决定：
+手机、iPad、Android 平板只使用 UU远程，不安装 Controller。
 
-- 绑定到某块屏：只创建该屏；
-- 配置为旁路：不创建 UUFlow 虚拟屏；
-- 名称未识别、未绑定、映射冲突或目标屏不可用：默认旁路。
-
-屏幕选择只由这一套路由决定，不再因为“远程中”就创建所有 enabled 屏。控制端名称到屏幕的判断集中在屏幕策略层，不再新增第二套设备识别或会话状态机。
-
-### 当前设备
-
-- **一加 12**：专属横屏已配置并完成自动路由。UU 实际名称为“一加 12 全网通版”。
-- **iPad Air M1**：按 iPad Air 第 5 代配置横屏，1640×2360、points 820；自动路由已完成。UU 实际名称为“iPad Air 5”。
-- **MacBook Neo**：专属电脑横屏最终冻结为自定义逻辑分辨率 **1408×881**、无刘海，UU 实际名称为“MacBook-Neo”，自动路由已完成。路由命中时，这块屏只在当前远程会话中临时成为主屏，让 Dock、已有窗口和新窗口随 macOS 进入 Neo 工作区；断开或换手时先恢复 Dell 主屏和原显示排列，再撤 Neo 屏。这个临时状态不写入 `AppConfig.mainScreen`。UU 由后台服务拉起、主界面尚无可读窗口时，UUFlow 会在后台恢复界面并展开本机被控详情，继续沿用同一套控制端表格识别；实机验收确认 Neo 屏重新进入 UURemoteServer 枚举与捕获、Dell 始终在线，退出顺序和 Dell 的 1920×1080 HiDPI、3840×2160 backing、120Hz 长期模式均正确。
-- **ThinkPad E16**：专属电脑横屏最终冻结为自定义逻辑分辨率 **1280×720**，UU 实际名称为“THINKPAD-E16”，自动路由已完成。1280×800 虽与面板 2560×1600 保持 2 倍关系，但在 ThinkPad 的 UU 实际画面区域中产生明显左右黑边，因此被实机结果淘汰。1280×720 改用 16:9 后，左右黑边基本消失，画面未见拉伸或裁切，字号仍可正常使用。
-- **Legion Y9000P**：UU 实际名称为“LEGION-Y9000P”，已显式绑定为旁路，不创建 UUFlow 虚拟屏，不改变 Mac mini 显示拓扑。
-
-### Phase 1 完成标准
-
-1. 一加连接时只出现一加屏；
-2. iPad 连接时只出现 iPad 屏；
-3. Neo 连接时只出现 Neo 电脑屏，且该屏在会话期间临时成为主屏；
-4. ThinkPad 连接时只出现 ThinkPad 电脑屏；
-5. Legion 连接时保持旁路；
-6. 未识别或未绑定设备保持旁路；
-7. 设备接管时旧屏撤掉、新设备对应屏按路由建立；
-8. Neo 断开或被其他设备接管时，先恢复 Dell 主屏和原排列，再撤 Neo 屏；Dell 始终在线，长期模式保持 1920×1080 HiDPI、3840×2160 backing、120Hz；
-9. 手机、平板继续使用触控增强；电脑屏保持普通显示器行为；
-10. `mainScreen` 默认保持为空；Neo 的主屏行为只由当前命中的控制端规则产生，不形成常驻虚拟主屏。
-
-一加、iPad、MacBook Neo 与 ThinkPad 的专属屏和自动路由已经在本地 feature branch `codex/controller-screen-routing-phase-0-5` 完成，Legion 已显式旁路；Neo 的后台控制端界面恢复、会话临时主屏、断开恢复和物理屏模式保护也已纳入同一套适配与屏幕调度回归。物理屏模式以远程前持续记录的空闲基线为准，不会把远控先行切出的临时模式当成用户设置。该分支尚未合并、未 push；Phase 1 已收口，Phase 2 尚未开始。
+远程画面和键鼠传输始终由 UU远程 负责；UUFlow 不自建远控协议。
 
 ---
 
-## Phase 2：MacBook Neo Controller
+## 品牌、兼容与上游边界
 
-目标设备首先是 MacBook Neo。
+### 用户可见名称
 
-第一批工作按以下顺序进行：
+后续用户可见内容统一使用 **UUFlow**：
 
-1. Neo 专属屏出现后，Controller 自动选择 UU远程 中对应的 `MacBook Neo` 显示标签；
-2. 实现本机 / 远端输入模式；
-3. 验证并接入 Alt+Tab 路由。
+- App 名称；
+- 菜单栏、窗口标题、关于页、欢迎页和设置；
+- 安装路径和安装包文件名；
+- README、ROADMAP 和用户文档；
+- 面向用户的状态、错误和日志说明；
+- 后续 Controller 名称。
 
-这一阶段先解决显示标签和键盘，不做触控板。输入模式的核心行为：
+不再在用户界面和普通文档中继续使用 Snug 作为产品名。
 
-- **本机模式**：快捷键继续作用于 MacBook Neo 本机；
-- **远端模式**：选定快捷键只作用于远程 Mac mini；
-- 模式切换不能让同一次按键同时作用于两端；
-- UU远程 不在前台、远程会话结束、Controller 退出或异常时，恢复安全的本机输入状态。
+### 内部兼容
 
-### Alt+Tab 技术验证
+为降低无价值改名风险，第一轮产品化不机械重命名所有内部源码符号。
 
-先只验证一件事：
+可以暂时保留：
 
-> UU远程 前台时，Controller 能否在远端模式阻止 Neo 本机消费 `Alt+Tab`，并让同一组合稳定到达 Mac mini，由 Mac mini 上现有的 AltTab 处理。
+- SnugCore、SnugSystem 等内部 Swift target / type；
+- 已存在的数据目录或 bundle identity；
+- 为兼容旧安装、辅助功能授权、配置与还原记录所需的内部路径。
 
-通过后做最小可用版：
+这些属于实现细节，不应继续暴露给普通用户。
 
-- 一个固定的本机 / 远端切换快捷键；
-- 轻量、明确的当前模式提示；
-- 可以快速回到本机模式；
+### 上游同步
+
+UUFlow 继续把 zephyr4123/snug 视为上游来源：
+
+- 上游 bug fix 和通用能力继续评估同步；
+- UUFlow 自己新增的控制端路由、临时主屏、物理屏恢复、键盘状态源和 Controller 保持独立；
+- 不为了方便同步而牺牲已经验证过的 UUFlow 行为；
+- 每次同步上游必须通过 UUFlow 自己的完整回归。
+
+---
+
+# Phase 1：设备专属屏与自动路由
+
+**状态：DONE / FROZEN。**
+
+目标是让不同控制端连接同一台 Mac mini 时，自动得到适合自己的屏幕；不需要增强显示的设备保持原有 UU远程 体验。
+
+## 路由原则
+
+UUFlow 复用现有“本机被控中”控制端读取，根据 UU 实际报告的控制端名称决定：
+
+- 绑定到某块屏：只创建对应专属屏；
+- 绑定为旁路：不创建 UUFlow 虚拟屏；
+- 未识别、未绑定、冲突或目标屏不可用：默认旁路。
+
+不再采用“只要远程中就创建全部 enabled 屏”的旧行为。
+
+UU 后台运行、主界面暂时不可读或“本机被控中”详情收起时，UUFlow 会在后台恢复可读界面并展开本机卡片，再继续使用同一套控制端表格识别。它不增加第二套识别机制，也不根据设备名称猜测平台；读不到、冲突或恢复前仍然安全旁路。
+
+## 已完成设备
+
+### 一加 12
+
+- 实际 UU 名称：一加 12 全网通版
+- 专属横屏；
+- 自动路由完成；
+- 手机触控与移动端行为沿用现有能力。
+
+### iPad Air M1
+
+- 实际 UU 名称：iPad Air 5
+- iPad Air 第 5 代 / M1；
+- 专属平板横屏；
+- 自动路由完成。
+
+### ThinkPad E16
+
+- 实际 UU 名称：THINKPAD-E16
+- 专属电脑屏；
+- 最终冻结逻辑分辨率：**1280×720**
+- 1280×800 已经因 UU 实际画布比例导致明显黑边而淘汰；
+- 自动路由完成；
+- computer 行为，不做手机/平板触控翻译。
+
+### MacBook Neo
+
+- 实际 UU 名称：MacBook-Neo
+- 专属电脑屏：**1408×881**
+- 自动路由完成；
+- 会话期间启用 mainDuringSession：
+  - Neo 专属屏创建后临时成为 Mac mini 主屏；
+  - Dock、主工作区和窗口随 macOS 进入 Neo 屏；
+  - Neo 断开或换手时先恢复 Dell 主屏与原排列，再撤 Neo 屏；
+  - AppConfig.mainScreen 仍为空，不形成常驻虚拟主屏。
+
+### Legion Y9000P
+
+- 实际 UU 名称：LEGION-Y9000P
+- 显式旁路；
+- 不创建 UUFlow 虚拟屏；
+- 不改变 Mac mini 显示拓扑。
+
+## Dell 物理屏保护
+
+Mac mini 当前 Dell 基线：
+
+- 型号：DELL S2725QS
+- 逻辑分辨率：1920×1080 HiDPI
+- backing：3840×2160
+- 刷新率：120Hz
+- BetterDisplay mode：115
+
+Phase 1 已经修复物理屏模式错误永久写回的问题。
+
+长期不变量：
+
+> UUFlow 创建、切换、设主屏和撤除虚拟屏，不得把远控期间出现的临时物理屏模式保存成新的长期基线。
+
+## Phase 1 冻结结论
+
+2026-11-26 最终审计确认：
+
+- 一加、iPad、ThinkPad、Neo 四类专属屏路由均已进入主线；
+- Legion 显式旁路，未识别、未绑定、冲突和不可用目标均默认旁路；
+- Neo `mainDuringSession` 正常，`AppConfig.mainScreen` 保持为空；
+- Dell 恢复逻辑保留原物理模式，不把远控期间的临时模式写成新基线；
+- 控制端表格收起或 UU 主界面暂时不可读时会恢复同一识别链，不会形成长期错误旁路；
+- `scripts/snug check` 完整通过：Swift 498 项、脚本 Python 15 项，零失败。
+
+Phase 1 的产品行为、真实设备验收、自动回归和文档已经一致。本阶段冻结；后续若修改这些能力，必须以本节不变量作为回归基线。
+
+---
+
+# Phase 2：UUFlow 产品化与单一控制端状态源
+
+这是 Phase 1 收口后的下一阶段。
+
+本阶段先完成产品身份和状态源统一，再进入 LOCAL / REMOTE Controller。目标是把现在分散在 UUFlow 与 Local Compute 的“当前控制端是谁”收敛成一个事实源。
+
+## 步骤 1：产品正式改名为 UUFlow
+
+用户可见产品全面改名：
+
+- App：UUFlow.app
+- About / Settings / Welcome / 状态栏：UUFlow
+- README / 用户文档：UUFlow
+- 安装包、窗口标题和面向用户的提示：UUFlow
+- GitHub 仓库继续使用 YuukiAS/UUFlow
+
+内部 Swift target、兼容路径和 bundle identity 暂不做无功能价值的大规模重命名。
+
+### 迁移要求
+
+改名不得造成：
+
+- 现有配置丢失；
+- 屏幕身份变化；
+- 辅助功能权限无必要失效；
+- 还原账丢失；
+- 新增一套平行 Application Support 数据目录。
+
+如果 App 文件名从 Snug.app 改为 UUFlow.app 会影响已有授权或安装替换流程，必须先设计一次性迁移和回滚，再切换；不能靠用户反复重新授权来证明改名成功。
+
+## 步骤 2：移除上游运行时自动更新
+
+当前 fork 已经有独立功能，不能再把 zephyr4123/snug 的 release 当成 UUFlow 的可安装“新版本”。
+
+因此正式移除运行时：
+
+- 启动自动检查；
+- “检查更新”设置；
+- 更新源选择；
+- 新版本弹窗；
+- 指向上游 zephyr4123/snug 和 dl.zephyrxiang.com/snug 的 update feed；
+- 任何会把当前 UUFlow 自动替换成上游 Snug build 的路径。
+
+保留开发阶段真正需要的：
+
+- build；
+- check；
+- install；
+- 本地打包能力。
+
+公开发布 UUFlow 之前，再单独设计 UUFlow 自己的 release / update source；本阶段不为未来发布提前造第二套更新系统。
+
+## 步骤 3：UUFlow 成为唯一控制端状态源
+
+现状存在两套识别：
+
+1. UUFlow 为了设备路由读取当前控制端；
+2. Local Compute 的 UUReadState.swift 另外读取 UU executable 固定 offset、解密 plist、读取 Cache.db 并调用私有接口，只为了再次判断 Windows/macOS。
+
+第二套链路已经因为 UU 更新移动二进制常量而真实失效过。
+
+最终应改成：
+
+    UU远程
+      ↓
+    UUFlow 已有控制端读取
+      ↓
+    控制端名称 + 平台 / 显式设备绑定
+      ↓
+    UUFlow 本地状态
+      ↓
+    Local Compute auto.py
+      ↓
+    Karabiner windows / mac / off
+
+### 平台来源优先级
+
+优先复用已有能力：
+
+1. 当前 UU 辅助功能树中若存在可靠的平台信息，直接读取；
+2. 如当前 UI 已不暴露平台，则复用 Phase 1 已确认的控制端名称绑定，在设备配置中显式声明键盘语义；
+3. 不再引入新的 UU binary/private API 识别链。
+
+禁止根据设备名称字符串猜平台。
+
+### 最小本地状态合同
+
+UUFlow 输出无敏感数据的本地状态，至少表达：
+
+- schema version；
+- remote 是否为 UU；
+- 当前是否存在有效控制端；
+- controller name；
+- controller platform（如可可靠取得）；
+- keyboard mode：windows | mac | off；
+- observation timestamp。
+
+必须保证：
+
+- 状态变化及时更新；
+- 活跃时有低频新鲜度证明；
+- UUFlow 退出、崩溃、辅助功能读取失败、控制端不明确、手机/平板控制或状态过期 → off；
+- 不输出 token、device ID、UU 账号、请求头或其他敏感信息。
+
+## 步骤 4：Local Compute 影子消费，再切生产
+
+跨仓库职责：
+
+### UUFlow
+
+负责：
+
+- UU 控制端识别；
+- 平台 / 显式键盘语义映射；
+- 本地状态输出；
+- 自己的打包、安装和回归。
+
+### Local_Compute_Infrastructure
+
+负责：
+
+- 读取 UUFlow 状态合同；
+- windows / mac / off 三态；
+- Karabiner 的 uu_remote_active、fallback 与切换顺序；
+- Mac mini 机器级安装、回滚和验证记录。
+
+迁移顺序必须是：
+
+1. 先部署 UUFlow 状态 producer；
+2. 在 ThinkPad 当前真实会话证明 windows；
+3. 在 Neo 真实会话证明 mac；
+4. Local Compute 候选读取 UUFlow 状态；
+5. 离线与临时验证全部通过；
+6. 原子切换 Local consumer；
+7. ThinkPad 真人最小验证 Ctrl+A/C/V；
+8. Neo 路径确认不会套 Windows 语义；
+9. 再退役旧 binary reader。
+
+任一时刻至少保留一条健康识别链。
+
+## 步骤 5：退役旧 UU 二进制 reader
+
+只有新链路真实生产通过后，才从 active runtime 删除：
+
+- UUReadState.swift
+- uu-read-state
+- 固定二进制 offset
+- UU executable 常量读取
+- plist 解密
+- Cache.db / 私有平台查询链中只服务于旧平台识别的活动代码
+- 对应构建与部署逻辑
+
+历史报告保留，明确标注为 retired implementation。
+
+完成后，UU 普通升级不应再因为二进制位置变化单独导致 Ctrl 整族失效。
+
+## Phase 2 完成标准
+
+- 用户可见产品名全部为 UUFlow；
+- 上游运行时更新入口完全退出产品；
+- UUFlow 是唯一控制端状态源；
+- ThinkPad → windows；
+- Neo → mac；
+- 手机/平板/未知/过期 → off；
+- Local Compute 只消费 UUFlow 状态；
+- 旧 binary reader 已从 active runtime 退役；
+- ThinkPad Ctrl+A/C/V 真人通过；
+- Phase 1 屏幕路由和 Dell 恢复没有回归。
+
+---
+
+# Phase 3：MacBook Neo LOCAL / REMOTE 键盘模式
+
+Phase 2 完成后开始。
+
+目标设备：MacBook Neo。
+
+第一版只做键盘，不做触控板。
+
+## 行为
+
+### LOCAL
+
+- 快捷键作用于 Neo 本机；
+- 不影响 macOS 原有操作。
+
+### REMOTE
+
+- 选定快捷键只作用于远程 Mac mini；
+- Neo 本机不能同时消费同一次快捷键。
+
+### 安全恢复
+
+以下情况自动回到 LOCAL：
+
+- UU远程 不在前台；
+- 远程会话结束；
+- Controller 退出；
+- Controller 异常；
+- 当前远端状态无法可靠确认。
+
+## 第一项技术门槛：Alt+Tab
+
+先只验证：
+
+> REMOTE 模式下能否阻止 Neo 本机消费 Alt+Tab，并让同一组合稳定到达 Mac mini，由 Mac mini 上现有 AltTab 处理。
+
+通过后再做：
+
+- 固定 LOCAL / REMOTE 切换快捷键；
+- 轻量状态提示；
+- 快速回到 LOCAL；
 - 不修改 UU远程 本体；
-- 不先做复杂设置界面。
+- 不先做复杂配置界面。
 
-其他快捷键等真实使用证明需要后再加。
-
----
-
-## Phase 3：Windows 本机 / 远端键盘模式
-
-macOS 键盘模式稳定后，把同一行为带到 ThinkPad / Windows 控制端。
-
-目标保持一致：
-
-- **本机模式**：系统快捷键作用于 Windows 本机；
-- **远端模式**：选定快捷键不再触发 Windows 本机动作，而是经 UU远程作用于 Mac mini；
-- 会话结束、Controller 退出或异常时恢复本机输入。
-
-复用 Phase 2 已经确定的状态模型、切换语义和恢复规则；Windows 底层按自己的稳定机制实现，不为了代码统一引入重量级跨平台框架。
-
-在真实链路验证前，不预设 Windows 的 `Alt`、`Win`、`Ctrl` 到远端 macOS 修饰键的最终映射。
+不把“自动选择 UU 显示标签”列为本阶段目标；当前设备专属屏已可正常使用，不为非必要体验继续扩张。
 
 ---
 
-## Phase 4：macOS 触控板远端手势
+# Phase 4：Windows LOCAL / REMOTE 键盘模式
 
-键盘本机 / 远端模式稳定后，再处理 MacBook Neo 触控板。
+Phase 3 稳定后，把同一行为模型带到 ThinkPad / Legion。
+
+目标：
+
+- LOCAL：快捷键作用于 Windows 本机；
+- REMOTE：选定快捷键只作用于远程 Mac；
+- 会话结束、Controller 退出或异常时恢复 LOCAL。
+
+复用 Phase 3 的模式语义、状态提示和恢复规则。
+
+Windows 底层按自己的稳定机制实现，不为了跨平台统一代码引入重量级框架。
+
+实际验证前不假设 Alt、Win、Ctrl 到远端 macOS 修饰键的最终组合。
+
+---
+
+# Phase 5：macOS 触控板远端手势
+
+只有 Phase 3 键盘模式稳定后开始。
 
 第一批目标：
 
-- 三指左右：切换远程 Mac 的 Space；
-- 三指上：远程 Mission Control；
-- 三指下：远程 App Exposé。
+- 三指左右 → 远程 Mac Space；
+- 三指上 → 远程 Mission Control；
+- 三指下 → 远程 App Exposé。
 
-本机模式保持 macOS 原有手势；远端模式下，同一手势只作用于远程 Mac，不能同时触发 Neo 本机的 Space 或 Mission Control。
+LOCAL 下保持 Neo 本机 macOS 手势。
 
-先做独立技术验证。优先使用稳定接口；如果只能观察手势、不能可靠阻止本机动作，再单独评估更底层方案，不把实验实现直接并入日常版本。
+REMOTE 下同一手势只作用于远程 Mac，本机不能同时执行。
 
----
-
-## Phase 5：Windows 触控板与后续输入增强
-
-只有 macOS 触控板方案已经证明有实际价值后，再评估 Windows Precision Touchpad。
-
-需要确认 Windows 能否稳定：
-
-- 区分三/四指系统手势；
-- 在远端模式阻止本机动作；
-- 将动作转换成远程 Mac 系统操作；
-- Controller 异常退出后可靠恢复。
-
-若这些条件不能稳定满足，Windows 保留键盘 Controller，不为了平台功能对称引入脆弱实现。
+先做独立技术验证。若公开接口只能观察、不能可靠阻止本机动作，再单独评估更底层实现；实验性路径不得直接进入日常版本。
 
 ---
 
-## 上游同步原则
+# Phase 6：Windows 触控板与后续增强
 
-UUFlow 是 Snug 的功能扩展，不以大规模重写上游为目标。
+只有 macOS 触控板方案证明实际价值后，再评估 Windows Precision Touchpad。
 
-长期原则：
+重点确认：
 
-- 尽量保留 Snug 的核心目录结构和成熟实现；
-- 被控端已有功能优先直接复用；
-- 新增能力优先补真实缺口，不重复实现已有模块；
-- Controller 放在独立目录 / target，减少与上游同步冲突；
-- 上游重要修复继续评估并同步；
-- 修改 Snug 原有行为时必须有明确的 UUFlow 用户价值；
-- 保留原项目版权与 MIT 许可要求。
+- 能否区分三/四指系统手势；
+- REMOTE 能否阻止 Windows 本机动作；
+- 能否稳定转成远程 Mac 系统操作；
+- Controller 异常退出后能否可靠恢复。
+
+无法稳定满足时，Windows 保留键盘 Controller，不为了功能对称引入脆弱实现。
+
+---
+
+## 两个仓库的长期职责
+
+### YuukiAS/UUFlow
+
+产品与远控行为的事实来源：
+
+- 控制端识别；
+- 专属屏和路由；
+- 移动端触控；
+- 电脑屏与临时主屏；
+- 控制端键盘语义状态；
+- Controller 产品。
+
+### YuukiAS/Local_Compute_Infrastructure
+
+机器配置与部署事实来源：
+
+- Mac mini / Neo / ThinkPad / Legion 的安装状态；
+- Karabiner 配置；
+- UUFlow 本地状态消费合同；
+- 系统级启动、回滚与验收；
+- BetterDisplay 等机器环境基线。
+
+Local Compute 不再复制 UUFlow 的控制端识别实现。
 
 ---
 
 ## 当前实施顺序
 
-1. **Phase 1 已完成**：一加、iPad、MacBook Neo 与 ThinkPad 按真实控制端名称自动路由到各自专属屏；Legion 显式旁路。
-2. **下一阶段是 Phase 2**：MacBook Neo Controller 先自动选择 Neo 显示标签，再实现本机 / 远端模式，最后接入 Alt+Tab 路由。
-3. **Phase 3**：把同一键盘模式带到 ThinkPad / Windows。
-4. **Phase 4**：MacBook Neo 三指 Space / Mission Control / App Exposé。
-5. **Phase 5**：最后评估 Windows 触控板与其他输入增强。
+1. **整合并冻结 Phase 1 当前本地实现**，确保全部真实验证提交进入主线。
+2. **Phase 2 / 产品化**：用户可见名称统一为 UUFlow。
+3. **Phase 2 / 更新收口**：移除上游 Snug 运行时更新检查和更新 UI。
+4. **Phase 2 / 状态源统一**：UUFlow 输出控制端键盘语义状态。
+5. **Phase 2 / 双仓迁移**：Local Compute 影子消费 → 真实验证 → 切生产 → 删除旧 binary reader。
+6. **Phase 3**：MacBook Neo LOCAL / REMOTE + Alt+Tab。
+7. **Phase 4**：Windows LOCAL / REMOTE。
+8. **Phase 5**：MacBook Neo 触控板远端手势。
+9. **Phase 6**：Windows 触控板与后续增强。
 
-Phase 1 没有收口前，不开始 Controller 和触控板开发。
+每一阶段通过自己的真实验收后再进入下一阶段；不为了“顺手”把未来阶段提前塞进当前实现。
